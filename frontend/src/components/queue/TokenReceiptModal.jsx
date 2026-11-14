@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Printer, Copy, Check, ExternalLink, X, Smartphone, Clock, MapPin, User, Stethoscope } from "lucide-react";
+import { Printer, Copy, Check, ExternalLink, X, Smartphone, Clock, MapPin, User, Stethoscope, Download } from "lucide-react";
 
 export function TokenReceiptModal({ token, onClose }) {
   const [copied, setCopied] = useState(false);
@@ -17,6 +17,16 @@ export function TokenReceiptModal({ token, onClose }) {
     window.print();
   };
 
+  const handleDownloadQr = () => {
+    if (!token.qrCodeData) return;
+    const a = document.createElement("a");
+    a.href = token.qrCodeData;
+    a.download = `MediQ_Token_${token.tokenNumber}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
       <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100 relative">
@@ -30,7 +40,7 @@ export function TokenReceiptModal({ token, onClose }) {
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg bg-white/10 hover:bg-white/20 text-white transition"
+            className="p-1 rounded-lg bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -52,6 +62,12 @@ export function TokenReceiptModal({ token, onClose }) {
             {token.patientName}
             {token.patientAge ? <span className="text-xs text-slate-600 font-normal ml-1">({token.patientAge}y, {token.patientGender})</span> : null}
           </div>
+
+          {token.appointmentType && (
+            <div className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+              {token.appointmentType}
+            </div>
+          )}
 
           {/* QR Code Container */}
           <div className="flex flex-col items-center justify-center py-2">
@@ -114,8 +130,17 @@ export function TokenReceiptModal({ token, onClose }) {
         {/* Modal Action Buttons (Hidden when printed) */}
         <div className="p-4 bg-slate-50 border-t border-slate-100 flex flex-wrap gap-2 justify-end">
           <button
+            onClick={handleDownloadQr}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 transition shadow-xs cursor-pointer"
+            title="Download QR code image file"
+          >
+            <Download className="w-3.5 h-3.5 text-teal-600" />
+            <span>Download QR</span>
+          </button>
+
+          <button
             onClick={handleCopyLink}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 transition shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 transition shadow-xs cursor-pointer"
           >
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-600" />}
             <span>{copied ? "Link Copied!" : "Copy URL"}</span>
@@ -125,7 +150,7 @@ export function TokenReceiptModal({ token, onClose }) {
             href={`/track/${token.id}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-teal-700 hover:bg-teal-50 transition shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-teal-700 hover:bg-teal-50 transition shadow-xs"
           >
             <ExternalLink className="w-3.5 h-3.5" />
             <span>Open Pass</span>
@@ -133,7 +158,7 @@ export function TokenReceiptModal({ token, onClose }) {
 
           <button
             onClick={handlePrint}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition shadow-sm"
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition shadow-xs cursor-pointer"
           >
             <Printer className="w-3.5 h-3.5" />
             <span>Print Slip</span>
@@ -143,4 +168,3 @@ export function TokenReceiptModal({ token, onClose }) {
     </div>
   );
 }
-

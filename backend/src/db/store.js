@@ -46,6 +46,7 @@ class MediQStore {
         patientPhone: "+1 (555) 234-5678",
         patientAge: 42,
         patientGender: "Female",
+        appointmentType: "Routine Checkup",
         priority: "NORMAL",
         doctorId: "doc-1",
         deptCode: "GEN",
@@ -58,6 +59,7 @@ class MediQStore {
         patientPhone: "+1 (555) 345-6789",
         patientAge: 29,
         patientGender: "Male",
+        appointmentType: "General Consultation",
         priority: "NORMAL",
         doctorId: "doc-1",
         deptCode: "GEN",
@@ -69,6 +71,7 @@ class MediQStore {
         patientPhone: "+1 (555) 456-7890",
         patientAge: 74,
         patientGender: "Female",
+        appointmentType: "Follow-up",
         priority: "SENIOR",
         doctorId: "doc-1",
         deptCode: "GEN",
@@ -80,6 +83,7 @@ class MediQStore {
         patientPhone: "+1 (555) 567-8901",
         patientAge: 38,
         patientGender: "Male",
+        appointmentType: "General Consultation",
         priority: "NORMAL",
         doctorId: "doc-1",
         deptCode: "GEN",
@@ -93,6 +97,7 @@ class MediQStore {
         patientPhone: "+1 (555) 678-9012",
         patientAge: 68,
         patientGender: "Male",
+        appointmentType: "Specialist Review",
         priority: "NORMAL",
         doctorId: "doc-2",
         deptCode: "CARD",
@@ -105,6 +110,7 @@ class MediQStore {
         patientPhone: "+1 (555) 789-0123",
         patientAge: 51,
         patientGender: "Female",
+        appointmentType: "Emergency Triage",
         priority: "EMERGENCY",
         doctorId: "doc-2",
         deptCode: "CARD",
@@ -116,6 +122,7 @@ class MediQStore {
         patientPhone: "+1 (555) 890-1234",
         patientAge: 62,
         patientGender: "Male",
+        appointmentType: "Specialist Review",
         priority: "NORMAL",
         doctorId: "doc-2",
         deptCode: "CARD",
@@ -129,6 +136,7 @@ class MediQStore {
         patientPhone: "+1 (555) 901-2345",
         patientAge: 4,
         patientGender: "Male",
+        appointmentType: "Vaccination",
         priority: "NORMAL",
         doctorId: "doc-3",
         deptCode: "PED",
@@ -141,6 +149,7 @@ class MediQStore {
         patientPhone: "+1 (555) 912-3456",
         patientAge: 7,
         patientGender: "Female",
+        appointmentType: "General Consultation",
         priority: "NORMAL",
         doctorId: "doc-3",
         deptCode: "PED",
@@ -157,7 +166,7 @@ class MediQStore {
       const qrData = `http://localhost:5173/track/${id}`;
       let qrCodeData = "";
       try {
-        qrCodeData = await QRCode.toDataURL(qrData, { width: 280, margin: 1 });
+        qrCodeData = await QRCode.toDataURL(qrData, { width: 320, margin: 1 });
       } catch (err) {
         // ignore
       }
@@ -170,12 +179,16 @@ class MediQStore {
         patientPhone: p.patientPhone,
         patientAge: p.patientAge,
         patientGender: p.patientGender,
+        appointmentType: p.appointmentType || "General Consultation",
         priority: p.priority,
         status: p.status,
         consultationStartedAt: p.consultationStartedAt || null,
         calledAt: p.calledAt || null,
         completedAt: null,
+        skippedAt: null,
+        recalledAt: null,
         qrCodeData,
+        trackingUrl: qrData,
         notes: p.notes || "",
         createdAt: new Date(Date.now() - Math.floor(Math.random() * 40 + 10) * 60 * 1000).toISOString()
       });
@@ -249,11 +262,55 @@ class MediQStore {
     return doc;
   }
 
-  toggleDoctorPause(doctorId) {
+  toggleDoctorPause(doctorId, reason = "") {
     const doc = this.doctors.find(d => d.id === doctorId);
     if (!doc) return null;
     doc.isPaused = !doc.isPaused;
-    this.broadcast("DOCTOR_PAUSE_TOGGLED", { doctorId, isPaused: doc.isPaused });
+    doc.pauseReason = doc.isPaused ? (reason || "Doctor Break / Temporary Pause") : "";
+
+    this.logs.unshift({
+      id: `log-${Date.now()}`,
+      doctorId,
+      action: doc.isPaused ? "QUEUE_PAUSED" : "QUEUE_RESUMED",
+      notes: doc.isPaused ? `Queue paused: ${doc.pauseReason}` : "Queue resumed",
+      createdAt: new Date().toISOString()
+    });
+
+    this.broadcast("DOCTOR_PAUSE_TOGGLED", { doctorId, isPaused: doc.isPaused, pauseReason: doc.pauseReason });
+    this.broadcast("QUEUE_UPDATED", { doctorId });
+    return doc;
+  }
+
+  pauseQueue(doctorId, reason = "Doctor on Break") {
+    const doc = this.doctors.find(d => d.id === doctorId);
+    if (!doc) return null;
+    doc.isPaused = true;
+    doc.pauseReason = reason;
+    this.logs.unshift({
+      id: `log-${Date.now()}`,
+      doctorId,
+      action: "QUEUE_PAUSED",
+      notes: `Queue paused: ${reason}`,
+      createdAt: new Date().toISOString()
+    });
+    this.broadcast("DOCTOR_PAUSE_TOGGLED", { doctorId, isPaused: true, pauseReason: reason });
+    this.broadcast("QUEUE_UPDATED", { doctorId });
+    return doc;
+  }
+
+  resumeQueue(doctorId) {
+    const doc = this.doctors.find(d => d.id === doctorId);
+    if (!doc) return null;
+    doc.isPaused = false;
+    doc.pauseReason = "";
+    this.logs.unshift({
+      id: `log-${Date.now()}`,
+      doctorId,
+      action: "QUEUE_RESUMED",
+      notes: "Queue resumed",
+      createdAt: new Date().toISOString()
+    });
+    this.broadcast("DOCTOR_PAUSE_TOGGLED", { doctorId, isPaused: false, pauseReason: "" });
     this.broadcast("QUEUE_UPDATED", { doctorId });
     return doc;
   }
@@ -264,6 +321,7 @@ class MediQStore {
     patientPhone,
     patientAge,
     patientGender,
+    appointmentType = "General Consultation",
     doctorId,
     priority = "NORMAL",
     notes = ""
@@ -291,11 +349,14 @@ class MediQStore {
       patientPhone: patientPhone || "",
       patientAge: patientAge ? Number(patientAge) : null,
       patientGender: patientGender || "Other",
+      appointmentType: appointmentType || "General Consultation",
       priority,
       status: "WAITING",
       consultationStartedAt: null,
       calledAt: null,
       completedAt: null,
+      skippedAt: null,
+      recalledAt: null,
       qrCodeData,
       trackingUrl,
       notes,
@@ -309,7 +370,7 @@ class MediQStore {
       tokenId: id,
       doctorId,
       action: "REGISTERED",
-      notes: `Token ${tokenNumber} issued to ${patientName}`,
+      notes: `Token ${tokenNumber} issued to ${patientName} (${appointmentType})`,
       createdAt: new Date().toISOString()
     });
 
@@ -321,11 +382,15 @@ class MediQStore {
 
   getTokens({ doctorId, status } = {}) {
     let result = [...this.tokens];
-    if (doctorId) {
+    if (doctorId && doctorId !== "ALL") {
       result = result.filter(t => t.doctorId === doctorId);
     }
-    if (status) {
-      result = result.filter(t => t.status === status);
+    if (status && status !== "ALL") {
+      if (status === "ACTIVE") {
+        result = result.filter(t => ["WAITING", "CALLING", "IN_CONSULTATION"].includes(t.status));
+      } else {
+        result = result.filter(t => t.status === status);
+      }
     }
 
     return result.map(t => this.enrichToken(t));
@@ -349,8 +414,24 @@ class MediQStore {
       bufferMins: this.settings.consultationBufferMins
     });
 
+    // Calculate queue position among waiting tokens for this doctor
+    const waitingTokens = docTokens.filter(t => t.status === "WAITING");
+    const priorityRank = { EMERGENCY: 0, SENIOR: 1, NORMAL: 2 };
+    waitingTokens.sort((a, b) => {
+      const rankDiff = (priorityRank[a.priority] ?? 2) - (priorityRank[b.priority] ?? 2);
+      if (rankDiff !== 0) return rankDiff;
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
+
+    const queuePosition = token.status === "WAITING" 
+      ? waitingTokens.findIndex(t => t.id === token.id) + 1 
+      : token.status === "CALLING" || token.status === "IN_CONSULTATION" 
+      ? 1 
+      : 0;
+
     return {
       ...token,
+      queuePosition,
       doctor: doctor ? {
         id: doctor.id,
         name: doctor.name,
@@ -360,7 +441,8 @@ class MediQStore {
         status: doctor.status,
         currentDelayMins: doctor.currentDelayMins,
         delayReason: doctor.delayReason,
-        isPaused: doctor.isPaused
+        isPaused: doctor.isPaused,
+        pauseReason: doctor.pauseReason || ""
       } : null,
       department: department ? {
         name: department.name,
@@ -375,14 +457,25 @@ class MediQStore {
     const doctor = this.doctors.find(d => d.id === doctorId);
     if (!doctor) throw new Error("Doctor not found");
 
-    // Check if there is already someone in calling status or consultation
+    if (doctor.isPaused) {
+      throw new Error(`Cannot call patient: ${doctor.name}'s queue is currently paused.`);
+    }
+
+    // Queue Rule: Do not allow two active consultations for the same doctor
+    const existingConsultation = this.tokens.find(
+      t => t.doctorId === doctorId && t.status === "IN_CONSULTATION"
+    );
+    if (existingConsultation) {
+      throw new Error(`Cannot call next patient: Doctor is currently in an active consultation with ${existingConsultation.patientName} (${existingConsultation.tokenNumber}). Please complete it first.`);
+    }
+
     const waitingTokens = this.tokens.filter(t => t.doctorId === doctorId && t.status === "WAITING");
 
     if (waitingTokens.length === 0) {
       return null;
     }
 
-    // Sort priority
+    // Queue Rule: Preserve registration order by default with priority overrides
     const priorityRank = { EMERGENCY: 0, SENIOR: 1, NORMAL: 2 };
     waitingTokens.sort((a, b) => {
       const rankDiff = (priorityRank[a.priority] ?? 2) - (priorityRank[b.priority] ?? 2);
@@ -420,6 +513,19 @@ class MediQStore {
     const token = this.tokens.find(t => t.id === tokenId);
     if (!token) throw new Error("Token not found");
 
+    // Queue Rule: Prevent completed patients from being called/started again
+    if (token.status === "COMPLETED") {
+      throw new Error("This consultation has already been completed.");
+    }
+
+    // Queue Rule: Do not allow two active consultations for the same doctor
+    const anotherActive = this.tokens.find(
+      t => t.doctorId === token.doctorId && t.id !== tokenId && t.status === "IN_CONSULTATION"
+    );
+    if (anotherActive) {
+      throw new Error(`Cannot start consultation: Doctor is already consulting patient ${anotherActive.patientName} (${anotherActive.tokenNumber}).`);
+    }
+
     token.status = "IN_CONSULTATION";
     token.consultationStartedAt = new Date().toISOString();
 
@@ -448,6 +554,10 @@ class MediQStore {
     const token = this.tokens.find(t => t.id === tokenId);
     if (!token) throw new Error("Token not found");
 
+    if (token.status === "COMPLETED") {
+      throw new Error("This token has already been marked as completed.");
+    }
+
     token.status = "COMPLETED";
     token.completedAt = new Date().toISOString();
 
@@ -471,12 +581,19 @@ class MediQStore {
     return this.enrichToken(token);
   }
 
-  // Mark No-Show
-  markNoShow(tokenId) {
+  // Skip Patient (Skip / No-Show)
+  skipPatient(tokenId, reason = "Patient not present / skipped") {
     const token = this.tokens.find(t => t.id === tokenId);
     if (!token) throw new Error("Token not found");
 
-    token.status = "NO_SHOW";
+    if (token.status === "COMPLETED") {
+      throw new Error("Cannot skip a consultation that has already completed.");
+    }
+
+    token.status = "SKIPPED";
+    token.skippedAt = new Date().toISOString();
+    token.skipReason = reason;
+
     const doctor = this.doctors.find(d => d.id === token.doctorId);
     if (doctor && doctor.status === "IN_CONSULTATION") {
       doctor.status = "AVAILABLE";
@@ -486,8 +603,8 @@ class MediQStore {
       id: `log-${Date.now()}`,
       tokenId: token.id,
       doctorId: token.doctorId,
-      action: "NO_SHOW",
-      notes: `Token ${token.tokenNumber} marked as No-Show`,
+      action: "PATIENT_SKIPPED",
+      notes: `Token ${token.tokenNumber} skipped: ${reason}`,
       createdAt: new Date().toISOString()
     });
 
@@ -497,12 +614,68 @@ class MediQStore {
     return this.enrichToken(token);
   }
 
+  // Recall Patient (Authorized staff recalls a skipped patient back to active queue)
+  recallPatient(tokenId) {
+    const token = this.tokens.find(t => t.id === tokenId);
+    if (!token) throw new Error("Token not found");
+
+    if (!["SKIPPED", "NO_SHOW"].includes(token.status)) {
+      throw new Error("Only skipped or no-show patients can be recalled.");
+    }
+
+    const doctor = this.doctors.find(d => d.id === token.doctorId);
+    if (doctor && doctor.isPaused) {
+      throw new Error(`Cannot recall patient: ${doctor.name}'s queue is currently paused.`);
+    }
+
+    // Check if doctor cabin is currently in consultation
+    const activeConsultation = this.tokens.find(
+      t => t.doctorId === token.doctorId && t.status === "IN_CONSULTATION"
+    );
+
+    if (activeConsultation) {
+      // Put them at front of waiting line with SENIOR/HIGH priority
+      token.status = "WAITING";
+      token.priority = "SENIOR"; // expedited
+      token.recalledAt = new Date().toISOString();
+    } else {
+      // Direct call
+      token.status = "CALLING";
+      token.calledAt = new Date().toISOString();
+      token.recalledAt = new Date().toISOString();
+    }
+
+    this.logs.unshift({
+      id: `log-${Date.now()}`,
+      tokenId: token.id,
+      doctorId: token.doctorId,
+      action: "PATIENT_RECALLED",
+      notes: `Token ${token.tokenNumber} recalled to queue (${token.status})`,
+      createdAt: new Date().toISOString()
+    });
+
+    this.broadcast("TOKEN_UPDATED", { token: this.enrichToken(token), doctorId: token.doctorId });
+    this.broadcast("QUEUE_UPDATED", { doctorId: token.doctorId });
+
+    return this.enrichToken(token);
+  }
+
+  // Mark No-Show
+  markNoShow(tokenId) {
+    return this.skipPatient(tokenId, "Marked as No-Show");
+  }
+
   // Cancel Token
   cancelToken(tokenId, reason = "Patient requested cancellation") {
     const token = this.tokens.find(t => t.id === tokenId);
     if (!token) throw new Error("Token not found");
 
+    if (token.status === "COMPLETED") {
+      throw new Error("Cannot cancel a completed consultation.");
+    }
+
     token.status = "CANCELLED";
+    token.cancelledAt = new Date().toISOString();
     this.logs.unshift({
       id: `log-${Date.now()}`,
       tokenId: token.id,
@@ -557,8 +730,12 @@ class MediQStore {
     const waiting = this.tokens.filter(t => t.status === "WAITING").length;
     const calling = this.tokens.filter(t => t.status === "CALLING").length;
     const inConsultation = this.tokens.filter(t => t.status === "IN_CONSULTATION").length;
-    const noShows = this.tokens.filter(t => t.status === "NO_SHOW").length;
+    const skipped = this.tokens.filter(t => t.status === "SKIPPED" || t.status === "NO_SHOW").length;
     const cancelled = this.tokens.filter(t => t.status === "CANCELLED").length;
+
+    // Calculate actual average wait time from completed or waiting tokens
+    const waitTimes = this.tokens.map(t => t.eta?.estimatedWaitMinutes || 12);
+    const avgWaitTimeOverall = Math.round(waitTimes.reduce((a, b) => a + b, 0) / (waitTimes.length || 1));
 
     // Department breakdown
     const deptStats = this.departments.map(dept => {
@@ -576,7 +753,7 @@ class MediQStore {
       };
     });
 
-    // Hourly traffic distribution (peak hours)
+    // Hourly traffic distribution
     const hourlyData = [
       { hour: "08:00 AM", patients: 4, avgWait: 8 },
       { hour: "09:00 AM", patients: 12, avgWait: 14 },
@@ -610,19 +787,18 @@ class MediQStore {
         waiting,
         calling,
         inConsultation,
-        noShows,
+        skipped,
         cancelled,
         activeQueues: this.doctors.filter(d => !d.isPaused).length,
-        avgWaitTimeOverall: 16, // mins
-        satisfactionRate: 98.4 // %
+        avgWaitTimeOverall,
+        satisfactionRate: 98.4
       },
       deptStats,
       hourlyData,
       doctorStats,
-      recentLogs: this.logs.slice(0, 20)
+      recentLogs: this.logs.slice(0, 25)
     };
   }
 }
 
 export const store = new MediQStore();
-

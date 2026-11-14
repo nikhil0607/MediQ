@@ -53,6 +53,15 @@ export const api = {
     method: "POST"
   }),
 
+  skipPatient: (tokenId, reason) => request(`/queue/tokens/${tokenId}/skip`, {
+    method: "POST",
+    body: JSON.stringify({ reason })
+  }),
+
+  recallPatient: (tokenId) => request(`/queue/tokens/${tokenId}/recall`, {
+    method: "POST"
+  }),
+
   markNoShow: (tokenId) => request(`/queue/tokens/${tokenId}/no-show`, {
     method: "POST"
   }),
@@ -65,6 +74,15 @@ export const api = {
   updateTokenPriority: (tokenId, priority) => request(`/queue/tokens/${tokenId}/priority`, {
     method: "PATCH",
     body: JSON.stringify({ priority })
+  }),
+
+  pauseDoctorQueue: (doctorId, reason) => request(`/queue/doctors/${doctorId}/pause`, {
+    method: "POST",
+    body: JSON.stringify({ reason })
+  }),
+
+  resumeDoctorQueue: (doctorId) => request(`/queue/doctors/${doctorId}/resume`, {
+    method: "POST"
   }),
 
   // Doctors
@@ -96,4 +114,3 @@ export const api = {
   // Health
   checkHealth: () => request("/health")
 };
-

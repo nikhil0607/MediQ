@@ -16,7 +16,7 @@ export function QueueProvider({ children }) {
 
   const { showToast } = useNotification();
 
-  // Load all initial state
+  // Load all initial state from backend
   const loadData = useCallback(async () => {
     try {
       const [tokRes, docRes, deptRes, setRes] = await Promise.all([
@@ -67,7 +67,6 @@ export function QueueProvider({ children }) {
               type: "info",
               sound: "notice"
             });
-            // Refresh doctors to update queue counts
             api.getDoctors().then(res => res.success && setDoctors(res.data));
           } else if (event === "PATIENT_CALLED") {
             const { token, doctor, cabin } = data;
@@ -79,7 +78,7 @@ export function QueueProvider({ children }) {
               sound: "call"
             });
             api.getDoctors().then(res => res.success && setDoctors(res.data));
-          } else if (event === "CONSULTATION_STARTED" || event === "CONSULTATION_COMPLETED" || event === "TOKEN_UPDATED") {
+          } else if (event === "CONSULTATION_STARTED" || event === "CONSULTATION_COMPLETED" || event === "TOKEN_UPDATED" || event === "PATIENT_SKIPPED" || event === "PATIENT_RECALLED") {
             if (data.token) {
               setTokens(prev => prev.map(t => t.id === data.token.id ? data.token : t));
             }
@@ -87,7 +86,6 @@ export function QueueProvider({ children }) {
           } else if (event === "DOCTOR_DELAY_CHANGED") {
             const { doctorId, delayMins, reason } = data;
             setDoctors(prev => prev.map(d => d.id === doctorId ? { ...d, currentDelayMins: Number(delayMins), delayReason: reason } : d));
-            // Refetch tokens to show newly recalculated ETAs for all waiting patients
             api.getTokens().then(res => res.success && setTokens(res.data));
             showToast({
               title: "Doctor Schedule Adjusted",
@@ -95,8 +93,8 @@ export function QueueProvider({ children }) {
               type: "warning"
             });
           } else if (event === "DOCTOR_PAUSE_TOGGLED") {
-            const { doctorId, isPaused } = data;
-            setDoctors(prev => prev.map(d => d.id === doctorId ? { ...d, isPaused } : d));
+            const { doctorId, isPaused, pauseReason } = data;
+            setDoctors(prev => prev.map(d => d.id === doctorId ? { ...d, isPaused, pauseReason } : d));
           } else if (event === "QUEUE_UPDATED") {
             api.getTokens().then(res => res.success && setTokens(res.data));
             api.getDoctors().then(res => res.success && setDoctors(res.data));
@@ -164,6 +162,24 @@ export function QueueProvider({ children }) {
     return res;
   };
 
+  const skipPatient = async (tokenId, reason = "Patient not present / skipped") => {
+    const res = await api.skipPatient(tokenId, reason);
+    if (res.success && res.data) {
+      setTokens(prev => prev.map(t => t.id === res.data.id ? res.data : t));
+      loadData();
+    }
+    return res;
+  };
+
+  const recallPatient = async (tokenId) => {
+    const res = await api.recallPatient(tokenId);
+    if (res.success && res.data) {
+      setTokens(prev => prev.map(t => t.id === res.data.id ? res.data : t));
+      loadData();
+    }
+    return res;
+  };
+
   const markNoShow = async (tokenId) => {
     const res = await api.markNoShow(tokenId);
     if (res.success && res.data) {
@@ -199,6 +215,22 @@ export function QueueProvider({ children }) {
     return res;
   };
 
+  const pauseDoctorQueue = async (doctorId, reason) => {
+    const res = await api.pauseDoctorQueue(doctorId, reason);
+    if (res.success) {
+      loadData();
+    }
+    return res;
+  };
+
+  const resumeDoctorQueue = async (doctorId) => {
+    const res = await api.resumeDoctorQueue(doctorId);
+    if (res.success) {
+      loadData();
+    }
+    return res;
+  };
+
   const toggleDoctorPause = async (doctorId) => {
     const res = await api.toggleDoctorPause(doctorId);
     if (res.success) {
@@ -222,10 +254,14 @@ export function QueueProvider({ children }) {
         callNext,
         startConsultation,
         finishConsultation,
+        skipPatient,
+        recallPatient,
         markNoShow,
         cancelToken,
         updateTokenPriority,
         setDoctorDelay,
+        pauseDoctorQueue,
+        resumeDoctorQueue,
         toggleDoctorPause
       }}
     >
@@ -239,4 +275,3 @@ export function useQueue() {
   if (!context) throw new Error("useQueue must be used within a QueueProvider");
   return context;
 }
-

@@ -30,26 +30,35 @@ export const createToken = async (req, res) => {
       patientPhone,
       patientAge,
       patientGender,
+      appointmentType,
       doctorId,
       priority,
       notes
     } = req.body;
 
-    if (!patientName || !doctorId) {
+    if (!patientName || !patientName.trim()) {
       return res.status(400).json({
         success: false,
-        message: "Patient name and doctor are required"
+        message: "Patient name is required"
+      });
+    }
+
+    if (!doctorId) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select an assigned doctor"
       });
     }
 
     const token = await store.createToken({
-      patientName,
-      patientPhone,
-      patientAge,
-      patientGender,
+      patientName: patientName.trim(),
+      patientPhone: patientPhone ? patientPhone.trim() : "",
+      patientAge: patientAge ? Number(patientAge) : null,
+      patientGender: patientGender || "Other",
+      appointmentType: appointmentType || "General Consultation",
       doctorId,
-      priority,
-      notes
+      priority: priority || "NORMAL",
+      notes: notes ? notes.trim() : ""
     });
 
     res.status(201).json({ success: true, message: "Token generated successfully", data: token });
@@ -69,14 +78,14 @@ export const callNextPatient = async (req, res) => {
     if (!token) {
       return res.status(200).json({
         success: false,
-        message: "No waiting patients remaining in this queue",
+        message: "No waiting patients remaining in this doctor's queue",
         data: null
       });
     }
 
     res.json({ success: true, message: `Called token ${token.tokenNumber}`, data: token });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(400).json({ success: false, message: err.message });
   }
 };
 
@@ -86,7 +95,7 @@ export const startConsultation = async (req, res) => {
     const token = store.startConsultation(id);
     res.json({ success: true, message: "Consultation started", data: token });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(400).json({ success: false, message: err.message });
   }
 };
 
@@ -96,7 +105,28 @@ export const finishConsultation = async (req, res) => {
     const token = store.finishConsultation(id);
     res.json({ success: true, message: "Consultation completed", data: token });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+export const skipPatient = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const token = store.skipPatient(id, reason);
+    res.json({ success: true, message: `Patient ${token.tokenNumber} skipped`, data: token });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+export const recallPatient = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const token = store.recallPatient(id);
+    res.json({ success: true, message: `Patient ${token.tokenNumber} recalled to queue`, data: token });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
   }
 };
 
@@ -106,7 +136,7 @@ export const markNoShow = async (req, res) => {
     const token = store.markNoShow(id);
     res.json({ success: true, message: "Marked as No-Show", data: token });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(400).json({ success: false, message: err.message });
   }
 };
 
@@ -117,7 +147,7 @@ export const cancelToken = async (req, res) => {
     const token = store.cancelToken(id, reason);
     res.json({ success: true, message: "Token cancelled", data: token });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(400).json({ success: false, message: err.message });
   }
 };
 
@@ -131,7 +161,27 @@ export const updatePriority = async (req, res) => {
     const token = store.updateTokenPriority(id, priority);
     res.json({ success: true, message: `Priority set to ${priority}`, data: token });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(400).json({ success: false, message: err.message });
   }
 };
 
+export const pauseQueue = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const doc = store.pauseQueue(id, reason);
+    res.json({ success: true, message: `Queue paused for ${doc.name}`, data: doc });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+export const resumeQueue = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const doc = store.resumeQueue(id);
+    res.json({ success: true, message: `Queue resumed for ${doc.name}`, data: doc });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
