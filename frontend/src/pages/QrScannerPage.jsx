@@ -252,7 +252,7 @@ export function QrScannerPage() {
                 <div>
                   <span className="text-slate-600">Assigned Doctor:</span>
                   <div className="font-bold text-slate-900 mt-0.5">
-                    {scannedResult.doctor?.name || "Dr. Sarah Jenkins"}
+                    {scannedResult.doctor?.name || "Dr. Ananya Sharma"}
                   </div>
                 </div>
                 <div>

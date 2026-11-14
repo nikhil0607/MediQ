@@ -147,26 +147,50 @@ export function Navbar() {
 
                   <button
                     onClick={() => {
-                      loginDemo("doctor_jenkins");
+                      loginDemo("doctor_sharma");
                       navigate("/doctor/doc-1");
                     }}
                     className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-semibold truncate cursor-pointer ${
                       user.role === "doctor" && user.doctorId === "doc-1" ? "bg-teal-50 text-teal-800" : "hover:bg-slate-50 text-slate-700"
                     }`}
                   >
-                    Dr. Sarah Jenkins (Cabin 102)
+                    Dr. Ananya Sharma (Cabin 102)
                   </button>
 
                   <button
                     onClick={() => {
-                      loginDemo("doctor_vance");
+                      loginDemo("doctor_iyer");
                       navigate("/doctor/doc-2");
                     }}
                     className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-semibold truncate cursor-pointer ${
                       user.role === "doctor" && user.doctorId === "doc-2" ? "bg-teal-50 text-teal-800" : "hover:bg-slate-50 text-slate-700"
                     }`}
                   >
-                    Dr. Marcus Vance (Cabin 204 - Delayed)
+                    Dr. Rajesh V. Iyer (Cabin 204 - Delayed)
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      loginDemo("doctor_nair");
+                      navigate("/doctor/doc-3");
+                    }}
+                    className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-semibold truncate cursor-pointer ${
+                      user.role === "doctor" && user.doctorId === "doc-3" ? "bg-teal-50 text-teal-800" : "hover:bg-slate-50 text-slate-700"
+                    }`}
+                  >
+                    Dr. Priya Nair (Cabin 108 - Pediatrics)
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      loginDemo("doctor_rathore");
+                      navigate("/doctor/doc-4");
+                    }}
+                    className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-semibold truncate cursor-pointer ${
+                      user.role === "doctor" && user.doctorId === "doc-4" ? "bg-teal-50 text-teal-800" : "hover:bg-slate-50 text-slate-700"
+                    }`}
+                  >
+                    Dr. Vikramaditya Rathore (Cabin 210)
                   </button>
 
                   <button

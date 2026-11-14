@@ -111,31 +111,43 @@ export function LoginPage() {
             >
               <div className="flex items-center gap-2">
                 <Users className="w-3.5 h-3.5 text-teal-600" />
-                <span>Demo Receptionist (Frontdesk Wing A)</span>
+                <span>Demo Receptionist: Pooja Verma (Wing A)</span>
               </div>
               <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
             </button>
 
             <button
               type="button"
-              onClick={() => handleQuickDemo("doctor_jenkins")}
+              onClick={() => handleQuickDemo("doctor_sharma")}
               className="w-full px-3 py-2 bg-white hover:bg-amber-100/60 border border-amber-200/80 rounded-xl text-xs font-semibold text-slate-800 flex items-center justify-between transition cursor-pointer shadow-2xs"
             >
               <div className="flex items-center gap-2">
                 <Stethoscope className="w-3.5 h-3.5 text-teal-600" />
-                <span>Demo Doctor: Dr. Sarah Jenkins (Cabin 102)</span>
+                <span>Demo Doctor: Dr. Ananya Sharma (Cabin 102)</span>
               </div>
               <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
             </button>
 
             <button
               type="button"
-              onClick={() => handleQuickDemo("doctor_vance")}
+              onClick={() => handleQuickDemo("doctor_iyer")}
               className="w-full px-3 py-2 bg-white hover:bg-amber-100/60 border border-amber-200/80 rounded-xl text-xs font-semibold text-slate-800 flex items-center justify-between transition cursor-pointer shadow-2xs"
             >
               <div className="flex items-center gap-2">
                 <Stethoscope className="w-3.5 h-3.5 text-amber-600" />
-                <span>Demo Doctor: Dr. Marcus Vance (Cabin 204 - Delayed)</span>
+                <span>Demo Doctor: Dr. Rajesh V. Iyer (Cabin 204 - Delayed)</span>
+              </div>
+              <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleQuickDemo("doctor_nair")}
+              className="w-full px-3 py-2 bg-white hover:bg-amber-100/60 border border-amber-200/80 rounded-xl text-xs font-semibold text-slate-800 flex items-center justify-between transition cursor-pointer shadow-2xs"
+            >
+              <div className="flex items-center gap-2">
+                <Stethoscope className="w-3.5 h-3.5 text-teal-600" />
+                <span>Demo Doctor: Dr. Priya Nair (Cabin 108 - Pediatrics)</span>
               </div>
               <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
             </button>
@@ -147,7 +159,7 @@ export function LoginPage() {
             >
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
-                <span>Demo Administrator (Operations)</span>
+                <span>Demo Administrator: Dr. Arvind Swaminathan</span>
               </div>
               <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
             </button>
@@ -195,7 +207,7 @@ export function LoginPage() {
                 type="button"
                 onClick={() => {
                   setSelectedRole("doctor");
-                  setEmail("doctor.jenkins@mediq.health");
+                  setEmail("doctor.sharma@mediq.health");
                 }}
                 className={`py-2 text-xs font-semibold rounded-xl border transition ${
                   selectedRole === "doctor"

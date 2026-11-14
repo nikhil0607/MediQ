@@ -408,7 +408,7 @@ export function ReceptionistDashboard() {
               Active Station
             </div>
             <div className="font-semibold text-white truncate">
-              {user?.name || "Elena Rostova (Lead Reception)"}
+              {user?.name || "Pooja Verma (Lead Reception - Wing A)"}
             </div>
             <div className="text-[11px] text-teal-400 mt-0.5">Frontdesk Wing A</div>
           </div>

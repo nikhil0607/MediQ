@@ -23,11 +23,11 @@ export function SettingsPage() {
   const { showToast } = useNotification();
 
   const [formData, setFormData] = useState({
-    clinicName: "MediQ Central Health Pavilion",
+    clinicName: "MediQ Apex Multi-Specialty Hospital & Research Institute",
     tagline: "Smart, Dignified Patient Queue Management",
-    address: "742 Healthcare Parkway, Medical District, Suite 200",
-    phone: "+1 (800) 555-MEDIQ",
-    emergencyPhone: "+1 (800) 911-HELP",
+    address: "Sector 14, Institutional Area, New Delhi - 110025",
+    phone: "+91 11 4982 7000",
+    emergencyPhone: "+91 11 4982 7911",
     consultationBufferMins: 2,
     enableAudioChime: true
   });

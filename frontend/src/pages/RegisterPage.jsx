@@ -116,10 +116,10 @@ export function RegisterPage() {
             </button>
             <button
               type="button"
-              onClick={() => handleQuickDemo("doctor_jenkins", "/doctor/doc-1")}
+              onClick={() => handleQuickDemo("doctor_sharma", "/doctor/doc-1")}
               className="px-2.5 py-1 bg-white hover:bg-amber-100 rounded-lg border border-amber-300 font-semibold text-[11px] text-amber-900 transition"
             >
-              Demo Doctor
+              Demo Doctor (Dr. Sharma)
             </button>
             <button
               type="button"
@@ -192,7 +192,7 @@ export function RegisterPage() {
               <input
                 type="text"
                 required
-                placeholder={formData.role === "doctor" ? "e.g. Dr. Ananya Sharma" : "e.g. Maya Lin"}
+                placeholder={formData.role === "doctor" ? "e.g. Dr. Ananya Sharma" : "e.g. Pooja Verma"}
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition"

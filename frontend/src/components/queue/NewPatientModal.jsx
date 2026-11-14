@@ -86,7 +86,7 @@ export function NewPatientModal({ doctors, onClose, onSubmit }) {
               <input
                 type="text"
                 required
-                placeholder="e.g. Clara Oswald"
+                placeholder="e.g. Sunita Aggarwal"
                 value={formData.patientName}
                 onChange={(e) => setFormData({ ...formData, patientName: e.target.value })}
                 className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition"
@@ -104,7 +104,7 @@ export function NewPatientModal({ doctors, onClose, onSubmit }) {
                 <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                 <input
                   type="tel"
-                  placeholder="+1 (555) 000-0000"
+                  placeholder="+91 98765 43210"
                   value={formData.patientPhone}
                   onChange={(e) => setFormData({ ...formData, patientPhone: e.target.value })}
                   className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition"

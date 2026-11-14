@@ -7,36 +7,74 @@ const AuthContext = createContext();
 export const DEMO_PROFILES = {
   receptionist: {
     role: "receptionist",
-    name: "Elena Rostova (Lead Reception)",
+    name: "Pooja Verma (Lead Reception - Wing A)",
     email: "reception@mediq.health",
     doctorId: null,
     department: "Triage & Frontdesk Wing A",
     isDemo: true
   },
-  doctor_jenkins: {
+  doctor_sharma: {
     role: "doctor",
     doctorId: "doc-1",
-    name: "Dr. Sarah Jenkins, MD",
-    email: "doctor.jenkins@mediq.health",
+    name: "Dr. Ananya Sharma, MD",
+    email: "doctor.sharma@mediq.health",
     specialization: "Internal Medicine Specialist",
     cabinNumber: "Cabin 102",
     isDemo: true
   },
-  doctor_vance: {
+  doctor_jenkins: {
+    // Legacy alias pointing to Dr. Sharma
+    role: "doctor",
+    doctorId: "doc-1",
+    name: "Dr. Ananya Sharma, MD",
+    email: "doctor.sharma@mediq.health",
+    specialization: "Internal Medicine Specialist",
+    cabinNumber: "Cabin 102",
+    isDemo: true
+  },
+  doctor_iyer: {
     role: "doctor",
     doctorId: "doc-2",
-    name: "Dr. Marcus Vance, FACC",
-    email: "doctor.vance@mediq.health",
+    name: "Dr. Rajesh V. Iyer, DM",
+    email: "doctor.iyer@mediq.health",
     specialization: "Senior Interventional Cardiologist",
     cabinNumber: "Cabin 204",
     isDemo: true
   },
+  doctor_vance: {
+    // Legacy alias pointing to Dr. Iyer
+    role: "doctor",
+    doctorId: "doc-2",
+    name: "Dr. Rajesh V. Iyer, DM",
+    email: "doctor.iyer@mediq.health",
+    specialization: "Senior Interventional Cardiologist",
+    cabinNumber: "Cabin 204",
+    isDemo: true
+  },
+  doctor_nair: {
+    role: "doctor",
+    doctorId: "doc-3",
+    name: "Dr. Priya Nair, MD",
+    email: "doctor.nair@mediq.health",
+    specialization: "Consultant Pediatrician & Neonatologist",
+    cabinNumber: "Cabin 108",
+    isDemo: true
+  },
+  doctor_rathore: {
+    role: "doctor",
+    doctorId: "doc-4",
+    name: "Dr. Vikramaditya Rathore, MS",
+    email: "doctor.rathore@mediq.health",
+    specialization: "Chief Orthopedic & Joint Replacement Surgeon",
+    cabinNumber: "Cabin 210",
+    isDemo: true
+  },
   admin: {
     role: "admin",
-    name: "Hospital Operations Director",
+    name: "Dr. Arvind Swaminathan (Medical Superintendent)",
     email: "admin@mediq.health",
     doctorId: null,
-    department: "Executive Administration",
+    department: "Executive Administration & Medical Board",
     isDemo: true
   }
 };

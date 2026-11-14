@@ -14,10 +14,16 @@ class MediQStore {
       GEN: 100,
       CARD: 200,
       PED: 300,
-      ORTHO: 400
+      ORTHO: 400,
+      DERM: 500,
+      GYN: 600,
+      OPHTH: 700,
+      ENT: 800,
+      NEURO: 900,
+      PULMO: 1000
     };
 
-    // Populate initial realistic active queues
+    // Populate initial realistic active queues with Indian names
     this.seedInitialQueues();
   }
 
@@ -40,23 +46,23 @@ class MediQStore {
 
   async seedInitialQueues() {
     const samplePatients = [
-      // Dr. Sarah Jenkins (General Medicine)
+      // Dr. Ananya Sharma (General Medicine)
       {
-        patientName: "Eleanor Vance",
-        patientPhone: "+1 (555) 234-5678",
+        patientName: "Sunita Aggarwal",
+        patientPhone: "+91 98112 34567",
         patientAge: 42,
         patientGender: "Female",
-        appointmentType: "Routine Checkup",
+        appointmentType: "Routine Health Checkup",
         priority: "NORMAL",
         doctorId: "doc-1",
         deptCode: "GEN",
         status: "IN_CONSULTATION",
-        consultationStartedAt: new Date(Date.now() - 6 * 60 * 1000).toISOString(), // 6 mins ago
-        notes: "Routine quarterly wellness check"
+        consultationStartedAt: new Date(Date.now() - 6 * 60 * 1000).toISOString(),
+        notes: "Routine quarterly wellness checkup & thyroid review"
       },
       {
-        patientName: "Michael Chang",
-        patientPhone: "+1 (555) 345-6789",
+        patientName: "Rahul Mehra",
+        patientPhone: "+91 98234 56789",
         patientAge: 29,
         patientGender: "Male",
         appointmentType: "General Consultation",
@@ -64,23 +70,23 @@ class MediQStore {
         doctorId: "doc-1",
         deptCode: "GEN",
         status: "WAITING",
-        notes: "Persistent seasonal allergies & cough"
+        notes: "Viral fever, throat irritation and body ache"
       },
       {
-        patientName: "Beatrice Miller",
-        patientPhone: "+1 (555) 456-7890",
+        patientName: "Kausalya Devi",
+        patientPhone: "+91 98345 67890",
         patientAge: 74,
         patientGender: "Female",
-        appointmentType: "Follow-up",
+        appointmentType: "Follow-up Review",
         priority: "SENIOR",
         doctorId: "doc-1",
         deptCode: "GEN",
         status: "WAITING",
-        notes: "Blood pressure prescription refill"
+        notes: "Hypertension prescription refill and blood sugar monitoring"
       },
       {
-        patientName: "David Kowalski",
-        patientPhone: "+1 (555) 567-8901",
+        patientName: "Amit Singhania",
+        patientPhone: "+91 98456 78901",
         patientAge: 38,
         patientGender: "Male",
         appointmentType: "General Consultation",
@@ -88,26 +94,26 @@ class MediQStore {
         doctorId: "doc-1",
         deptCode: "GEN",
         status: "WAITING",
-        notes: "Mild fever and fatigue"
+        notes: "Mild fever and acute fatigue"
       },
 
-      // Dr. Marcus Vance (Cardiology) - Doctor with a 15 min delay
+      // Dr. Rajesh V. Iyer (Cardiology) - Doctor with a 15 min delay
       {
-        patientName: "Arthur Pendelton",
-        patientPhone: "+1 (555) 678-9012",
+        patientName: "Ramesh Chandra Gupta",
+        patientPhone: "+91 98567 89012",
         patientAge: 68,
         patientGender: "Male",
-        appointmentType: "Specialist Review",
+        appointmentType: "Specialist Consultation",
         priority: "NORMAL",
         doctorId: "doc-2",
         deptCode: "CARD",
         status: "IN_CONSULTATION",
         consultationStartedAt: new Date(Date.now() - 4 * 60 * 1000).toISOString(),
-        notes: "Post-angioplasty follow-up"
+        notes: "Post-angioplasty stent 3-month checkup"
       },
       {
-        patientName: "Sophia Rodriguez",
-        patientPhone: "+1 (555) 789-0123",
+        patientName: "Deepa Krishnan",
+        patientPhone: "+91 98678 90123",
         patientAge: 51,
         patientGender: "Female",
         appointmentType: "Emergency Triage",
@@ -115,25 +121,25 @@ class MediQStore {
         doctorId: "doc-2",
         deptCode: "CARD",
         status: "WAITING",
-        notes: "Acute chest discomfort & arrhythmia"
+        notes: "Acute retrosternal chest pain & palpitation"
       },
       {
-        patientName: "James Harrison",
-        patientPhone: "+1 (555) 890-1234",
+        patientName: "Manpreet Singh Gill",
+        patientPhone: "+91 98789 01234",
         patientAge: 62,
         patientGender: "Male",
-        appointmentType: "Specialist Review",
+        appointmentType: "Specialist Consultation",
         priority: "NORMAL",
         doctorId: "doc-2",
         deptCode: "CARD",
         status: "WAITING",
-        notes: "Stress test evaluation"
+        notes: "TMT stress test and Holter monitoring review"
       },
 
-      // Dr. Emily Thorne (Pediatrics)
+      // Dr. Priya Nair (Pediatrics)
       {
-        patientName: "Leo Thomas (Mother: Claire)",
-        patientPhone: "+1 (555) 901-2345",
+        patientName: "Aarav Mehta (Mother: Neha)",
+        patientPhone: "+91 98890 12345",
         patientAge: 4,
         patientGender: "Male",
         appointmentType: "Vaccination",
@@ -142,11 +148,11 @@ class MediQStore {
         deptCode: "PED",
         status: "CALLING",
         calledAt: new Date(Date.now() - 1 * 60 * 1000).toISOString(),
-        notes: "4-year vaccination and growth milestone"
+        notes: "Booster vaccination and pediatric developmental milestone review"
       },
       {
-        patientName: "Aaliyah Khan",
-        patientPhone: "+1 (555) 912-3456",
+        patientName: "Anaya Joshi",
+        patientPhone: "+91 98901 23456",
         patientAge: 7,
         patientGender: "Female",
         appointmentType: "General Consultation",
@@ -154,7 +160,77 @@ class MediQStore {
         doctorId: "doc-3",
         deptCode: "PED",
         status: "WAITING",
-        notes: "Mild ear infection"
+        notes: "Persistent dry cough and mild wheezing"
+      },
+
+      // Dr. Vikramaditya Rathore (Orthopedics)
+      {
+        patientName: "Vikram Malhotra",
+        patientPhone: "+91 99123 45678",
+        patientAge: 55,
+        patientGender: "Male",
+        appointmentType: "Specialist Consultation",
+        priority: "NORMAL",
+        doctorId: "doc-4",
+        deptCode: "ORTHO",
+        status: "WAITING",
+        notes: "Bilateral knee osteoarthritis & joint mobility stiffness"
+      },
+
+      // Dr. Arjun Banerjee (Dermatology)
+      {
+        patientName: "Pooja Nambiar",
+        patientPhone: "+91 99234 56789",
+        patientAge: 31,
+        patientGender: "Female",
+        appointmentType: "General Consultation",
+        priority: "NORMAL",
+        doctorId: "doc-5",
+        deptCode: "DERM",
+        status: "WAITING",
+        notes: "Contact dermatitis and skin allergy follow-up"
+      },
+
+      // Dr. Sunita Deshmukh (Obstetrics & Gynecology)
+      {
+        patientName: "Vandana Sharma",
+        patientPhone: "+91 99345 67890",
+        patientAge: 28,
+        patientGender: "Female",
+        appointmentType: "Routine Health Checkup",
+        priority: "NORMAL",
+        doctorId: "doc-6",
+        deptCode: "GYN",
+        status: "WAITING",
+        notes: "Antenatal 2nd trimester anomaly scan review"
+      },
+
+      // Dr. Sneha Kulkarni (Ophthalmology)
+      {
+        patientName: "Harish Natarajan",
+        patientPhone: "+91 99456 78901",
+        patientAge: 64,
+        patientGender: "Male",
+        appointmentType: "Specialist Consultation",
+        priority: "SENIOR",
+        doctorId: "doc-7",
+        deptCode: "OPHTH",
+        status: "WAITING",
+        notes: "Cataract pre-operative evaluation and intraocular lens planning"
+      },
+
+      // Dr. Meenakshi Sundaram (ENT)
+      {
+        patientName: "Balwinder Kaur",
+        patientPhone: "+91 99567 89012",
+        patientAge: 49,
+        patientGender: "Female",
+        appointmentType: "Follow-up Review",
+        priority: "NORMAL",
+        doctorId: "doc-8",
+        deptCode: "ENT",
+        status: "WAITING",
+        notes: "Chronic sinusitis and nasal endoscopy check"
       }
     ];
 

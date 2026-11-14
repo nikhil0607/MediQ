@@ -732,8 +732,8 @@ export function LandingPage() {
                 Hospital Portals
               </div>
               <div><Link to="/receptionist" className="text-slate-600 hover:text-teal-700">Reception Desk</Link></div>
-              <div><Link to="/doctor/doc-1" className="text-slate-600 hover:text-teal-700">Dr. Sarah Jenkins (Cabin 102)</Link></div>
-              <div><Link to="/doctor/doc-2" className="text-slate-600 hover:text-teal-700">Dr. Marcus Vance (Cabin 204)</Link></div>
+              <div><Link to="/doctor/doc-1" className="text-slate-600 hover:text-teal-700">Dr. Ananya Sharma (Cabin 102)</Link></div>
+              <div><Link to="/doctor/doc-2" className="text-slate-600 hover:text-teal-700">Dr. Rajesh V. Iyer (Cabin 204)</Link></div>
               <div><Link to="/display" className="text-slate-600 hover:text-teal-700">Waiting Room TV Display</Link></div>
               <div><Link to="/scanner" className="text-slate-600 hover:text-teal-700">QR Door Scanner</Link></div>
             </div>
