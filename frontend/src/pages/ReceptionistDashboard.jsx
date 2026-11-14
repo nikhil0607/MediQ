@@ -8,6 +8,7 @@ import { TokenReceiptModal } from "../components/queue/TokenReceiptModal";
 import { PriorityModal } from "../components/queue/PriorityModal";
 import { ConfirmationModal } from "../components/common/ConfirmationModal";
 import {
+  Activity,
   LayoutDashboard,
   UserPlus,
   Users,
