@@ -9,14 +9,16 @@ export default defineConfig({
     tailwindcss(),
   ],
   server: {
+    host: true, // Listen on all local and network addresses (0.0.0.0, localhost, 127.0.0.1)
     port: 5173,
+    cors: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: 'http://127.0.0.1:5000',
         changeOrigin: true,
       },
       '/events': {
-        target: 'http://localhost:5000',
+        target: 'http://127.0.0.1:5000',
         changeOrigin: true,
       }
     }
