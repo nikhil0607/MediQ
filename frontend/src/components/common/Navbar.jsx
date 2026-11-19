@@ -141,7 +141,7 @@ export function Navbar() {
                       user.role === "receptionist" ? "bg-teal-50 text-teal-800" : "hover:bg-slate-50 text-slate-700"
                     }`}
                   >
-                    <span>Reception Desk</span>
+                    <span>Reception Desk (Pooja Verma)</span>
                     {user.role === "receptionist" && <span className="text-[10px] font-bold text-teal-600">ACTIVE</span>}
                   </button>
 
@@ -154,43 +154,29 @@ export function Navbar() {
                       user.role === "doctor" && user.doctorId === "doc-1" ? "bg-teal-50 text-teal-800" : "hover:bg-slate-50 text-slate-700"
                     }`}
                   >
-                    Dr. Ananya Sharma (Cabin 102)
+                    Dr. Sharma (Cabin 102 - General)
                   </button>
 
                   <button
                     onClick={() => {
-                      loginDemo("doctor_iyer");
+                      loginDemo("doctor_mehta");
                       navigate("/doctor/doc-2");
                     }}
                     className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-semibold truncate cursor-pointer ${
                       user.role === "doctor" && user.doctorId === "doc-2" ? "bg-teal-50 text-teal-800" : "hover:bg-slate-50 text-slate-700"
                     }`}
                   >
-                    Dr. Rajesh V. Iyer (Cabin 204 - Delayed)
+                    Dr. Mehta (Cabin 105 - Dermatology)
                   </button>
 
                   <button
                     onClick={() => {
-                      loginDemo("doctor_nair");
-                      navigate("/doctor/doc-3");
+                      navigate("/track/GEN-103");
                     }}
-                    className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-semibold truncate cursor-pointer ${
-                      user.role === "doctor" && user.doctorId === "doc-3" ? "bg-teal-50 text-teal-800" : "hover:bg-slate-50 text-slate-700"
-                    }`}
+                    className="w-full text-left px-3 py-1.5 rounded-xl text-xs font-semibold text-teal-700 hover:bg-teal-50 flex items-center justify-between cursor-pointer"
                   >
-                    Dr. Priya Nair (Cabin 108 - Pediatrics)
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      loginDemo("doctor_rathore");
-                      navigate("/doctor/doc-4");
-                    }}
-                    className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-semibold truncate cursor-pointer ${
-                      user.role === "doctor" && user.doctorId === "doc-4" ? "bg-teal-50 text-teal-800" : "hover:bg-slate-50 text-slate-700"
-                    }`}
-                  >
-                    Dr. Vikramaditya Rathore (Cabin 210)
+                    <span>Patient 3 Pass (GEN-103)</span>
+                    <span className="text-[10px] px-1 bg-teal-100 text-teal-800 rounded">LIVE</span>
                   </button>
 
                   <button
@@ -202,7 +188,7 @@ export function Navbar() {
                       user.role === "admin" ? "bg-teal-50 text-teal-800" : "hover:bg-slate-50 text-slate-700"
                     }`}
                   >
-                    <span>Clinic Admin</span>
+                    <span>Clinic Admin (Reset Controls)</span>
                     {user.role === "admin" && <span className="text-[10px] font-bold text-teal-600">ACTIVE</span>}
                   </button>
 

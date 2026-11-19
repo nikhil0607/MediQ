@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { api } from "../services/api";
 import { useQueue } from "../context/QueueContext";
+import { useAuth } from "../context/AuthContext";
 import { useNotification } from "../context/NotificationContext";
 import { sounds } from "../utils/audio";
 import {
@@ -15,12 +16,17 @@ import {
   ShieldCheck,
   Phone,
   MapPin,
-  RefreshCw
+  RefreshCw,
+  Sparkles,
+  AlertTriangle,
+  RotateCcw
 } from "lucide-react";
 
 export function SettingsPage() {
-  const { settings, doctors, refresh } = useQueue();
+  const { settings, doctors, refresh, resetDemoData } = useQueue();
+  const { user, loginDemo } = useAuth();
   const { showToast } = useNotification();
+  const [resetting, setResetting] = useState(false);
 
   const [formData, setFormData] = useState({
     clinicName: "MediQ Apex Multi-Specialty Hospital & Research Institute",
@@ -71,6 +77,42 @@ export function SettingsPage() {
     setTimeout(() => setTestChimePlaying(false), 2000);
   };
 
+  const handleResetDemo = async () => {
+    if (user?.role !== "admin") {
+      showToast({
+        title: "Access Restricted",
+        message: "Resetting demo data is restricted to Demo Administrators. Please switch to Admin demo role.",
+        type: "error"
+      });
+      return;
+    }
+
+    if (!window.confirm("Reset all patient queues, doctor delays, and active tokens back to the baseline demo scenario (MediQ Care Centre)?")) {
+      return;
+    }
+
+    setResetting(true);
+    try {
+      const res = await resetDemoData();
+      if (res.success) {
+        showToast({
+          title: "Demo Data Reset",
+          message: "Queues and doctor schedules have been reset to baseline scenario (MediQ Care Centre).",
+          type: "success"
+        });
+        await refresh();
+      }
+    } catch (err) {
+      showToast({
+        title: "Reset Failed",
+        message: err.message,
+        type: "error"
+      });
+    } finally {
+      setResetting(false);
+    }
+  };
+
   const supabaseUrlSet = Boolean(import.meta.env.VITE_SUPABASE_URL);
 
   return (
@@ -91,6 +133,84 @@ export function SettingsPage() {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 pt-8 space-y-8">
+        {/* Hackathon Demo Control Card */}
+        <div className="bg-amber-50/80 rounded-3xl p-6 sm:p-7 border border-amber-200/80 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-amber-200">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-amber-600 text-white flex items-center justify-center">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-bold text-amber-950">Hackathon Demonstration Control</h2>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 uppercase">
+                    Admin Only
+                  </span>
+                </div>
+                <p className="text-xs text-amber-800 mt-0.5">
+                  Reset clinic data back to the baseline demo scenario (MediQ Care Centre)
+                </p>
+              </div>
+            </div>
+
+            <div className="text-right">
+              <span className={`text-xs font-semibold px-2.5 py-1 rounded-xl border ${
+                user?.role === "admin"
+                  ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                  : "bg-white text-slate-600 border-slate-200"
+              }`}>
+                Current: {user?.role ? user.role.toUpperCase() : "GUEST"}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+            <div className="bg-white/70 p-3 rounded-2xl border border-amber-200/60">
+              <span className="text-slate-500 font-semibold block text-[10px] uppercase">Clinic Setup</span>
+              <strong className="text-slate-900 block mt-0.5">MediQ Care Centre</strong>
+              <span className="text-slate-500 text-[11px]">Primary care & specialty triage</span>
+            </div>
+            <div className="bg-white/70 p-3 rounded-2xl border border-amber-200/60">
+              <span className="text-slate-500 font-semibold block text-[10px] uppercase">Doctor 1 (Cabin 102)</span>
+              <strong className="text-slate-900 block mt-0.5">Dr. Sharma</strong>
+              <span className="text-teal-700 text-[11px]">General Physician</span>
+            </div>
+            <div className="bg-white/70 p-3 rounded-2xl border border-amber-200/60">
+              <span className="text-slate-500 font-semibold block text-[10px] uppercase">Doctor 2 (Cabin 105)</span>
+              <strong className="text-slate-900 block mt-0.5">Dr. Mehta</strong>
+              <span className="text-teal-700 text-[11px]">Dermatologist</span>
+            </div>
+          </div>
+
+          <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="text-xs text-amber-900 leading-relaxed">
+              Resets all active consultations, tokens, patient positions, and doctor delays back to the initial 6-patient demo state.
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {user?.role !== "admin" && (
+                <button
+                  type="button"
+                  onClick={() => loginDemo("admin")}
+                  className="px-3.5 py-2 text-xs font-semibold rounded-xl bg-white border border-amber-300 text-amber-900 hover:bg-amber-100 transition cursor-pointer"
+                >
+                  Switch to Admin Profile
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={handleResetDemo}
+                disabled={resetting}
+                className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/20 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <RotateCcw className={`w-3.5 h-3.5 ${resetting ? "animate-spin" : ""}`} />
+                <span>{resetting ? "Resetting Queues..." : "Reset Demo Data"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
         <form onSubmit={handleSave} className="space-y-8">
           {/* Clinic Profile */}
           <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm space-y-5">

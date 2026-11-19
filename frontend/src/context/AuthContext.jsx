@@ -7,71 +7,43 @@ const AuthContext = createContext();
 export const DEMO_PROFILES = {
   receptionist: {
     role: "receptionist",
-    name: "Pooja Verma (Lead Reception - Wing A)",
+    name: "Pooja Verma (Reception Desk)",
     email: "reception@mediq.health",
     doctorId: null,
+    clinic: "MediQ Care Centre",
     department: "Triage & Frontdesk Wing A",
     isDemo: true
   },
   doctor_sharma: {
     role: "doctor",
     doctorId: "doc-1",
-    name: "Dr. Ananya Sharma, MD",
-    email: "doctor.sharma@mediq.health",
-    specialization: "Internal Medicine Specialist",
+    name: "Dr. Sharma",
+    email: "dr.sharma@mediq.health",
+    specialization: "General Physician",
     cabinNumber: "Cabin 102",
     isDemo: true
   },
-  doctor_jenkins: {
-    // Legacy alias pointing to Dr. Sharma
+  doctor_mehta: {
     role: "doctor",
+    doctorId: "doc-2",
+    name: "Dr. Mehta",
+    email: "dr.mehta@mediq.health",
+    specialization: "Dermatologist",
+    cabinNumber: "Cabin 105",
+    isDemo: true
+  },
+  patient: {
+    role: "patient",
+    name: "Amit Kumar (Patient 3)",
+    email: "patient.amit@mediq.health",
+    tokenNumber: "GEN-103",
+    passToken: "GEN-103",
     doctorId: "doc-1",
-    name: "Dr. Ananya Sharma, MD",
-    email: "doctor.sharma@mediq.health",
-    specialization: "Internal Medicine Specialist",
-    cabinNumber: "Cabin 102",
-    isDemo: true
-  },
-  doctor_iyer: {
-    role: "doctor",
-    doctorId: "doc-2",
-    name: "Dr. Rajesh V. Iyer, DM",
-    email: "doctor.iyer@mediq.health",
-    specialization: "Senior Interventional Cardiologist",
-    cabinNumber: "Cabin 204",
-    isDemo: true
-  },
-  doctor_vance: {
-    // Legacy alias pointing to Dr. Iyer
-    role: "doctor",
-    doctorId: "doc-2",
-    name: "Dr. Rajesh V. Iyer, DM",
-    email: "doctor.iyer@mediq.health",
-    specialization: "Senior Interventional Cardiologist",
-    cabinNumber: "Cabin 204",
-    isDemo: true
-  },
-  doctor_nair: {
-    role: "doctor",
-    doctorId: "doc-3",
-    name: "Dr. Priya Nair, MD",
-    email: "doctor.nair@mediq.health",
-    specialization: "Consultant Pediatrician & Neonatologist",
-    cabinNumber: "Cabin 108",
-    isDemo: true
-  },
-  doctor_rathore: {
-    role: "doctor",
-    doctorId: "doc-4",
-    name: "Dr. Vikramaditya Rathore, MS",
-    email: "doctor.rathore@mediq.health",
-    specialization: "Chief Orthopedic & Joint Replacement Surgeon",
-    cabinNumber: "Cabin 210",
     isDemo: true
   },
   admin: {
     role: "admin",
-    name: "Dr. Arvind Swaminathan (Medical Superintendent)",
+    name: "Dr. Arvind Swaminathan (Demo Administrator)",
     email: "admin@mediq.health",
     doctorId: null,
     department: "Executive Administration & Medical Board",

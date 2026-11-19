@@ -78,6 +78,8 @@ export const api = {
     return request(`/queue/audit-logs${query ? `?${query}` : ""}`);
   },
 
+  resetDemoData: () => request("/queue/reset-demo", { method: "POST" }),
+
   markNoShow: (tokenId) => request(`/queue/tokens/${tokenId}/no-show`, {
     method: "POST"
   }),

@@ -14,13 +14,15 @@ import {
   updatePriority,
   pauseQueue,
   resumeQueue,
-  getAuditLogs
+  getAuditLogs,
+  resetDemoData
 } from "../controllers/queueController.js";
 
 const router = express.Router();
 
 router.get("/tokens", getTokens);
 router.get("/audit-logs", getAuditLogs);
+router.post("/reset-demo", resetDemoData);
 router.get("/tokens/:id", getTokenById);
 router.get("/pass/:passToken", getPublicPass);
 router.post("/tokens", createToken);

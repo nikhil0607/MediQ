@@ -75,11 +75,11 @@ export const initialDepartments = [
 export const initialDoctors = [
   {
     id: "doc-1",
-    name: "Dr. Ananya Sharma, MD",
-    email: "ananya.sharma@mediq.health",
+    name: "Dr. Sharma",
+    email: "dr.sharma@mediq.health",
     departmentId: "dept-1",
     departmentName: "General Medicine",
-    specialization: "Internal Medicine Specialist",
+    specialization: "General Physician",
     cabinNumber: "Cabin 102",
     avgConsultationMins: 10,
     status: "IN_CONSULTATION",
@@ -90,16 +90,16 @@ export const initialDoctors = [
   },
   {
     id: "doc-2",
-    name: "Dr. Rajesh V. Iyer, DM",
-    email: "rajesh.iyer@mediq.health",
-    departmentId: "dept-2",
-    departmentName: "Cardiology & Vascular",
-    specialization: "Senior Interventional Cardiologist",
-    cabinNumber: "Cabin 204",
-    avgConsultationMins: 15,
-    status: "IN_CONSULTATION",
-    currentDelayMins: 15,
-    delayReason: "Emergency Ward Angiography Consultation",
+    name: "Dr. Mehta",
+    email: "dr.mehta@mediq.health",
+    departmentId: "dept-5",
+    departmentName: "Dermatology & Skin Care",
+    specialization: "Dermatologist",
+    cabinNumber: "Cabin 105",
+    avgConsultationMins: 12,
+    status: "AVAILABLE",
+    currentDelayMins: 0,
+    delayReason: "",
     isPaused: false,
     activeQueueId: "queue-2"
   },
@@ -256,9 +256,9 @@ export const initialDoctors = [
 ];
 
 export const initialSettings = {
-  clinicName: "MediQ Apex Multi-Specialty Hospital & Research Institute",
+  clinicName: "MediQ Care Centre",
   tagline: "Smart, Dignified Patient Queue Management Platform",
-  address: "Plot 14, Institutional Area, Health City, Sector 44, New Delhi, Delhi 110001",
+  address: "Health City, Sector 44, New Delhi, Delhi 110001",
   phone: "+91 (11) 4500-8000",
   emergencyPhone: "+91 98110 23456",
   consultationBufferMins: 2,

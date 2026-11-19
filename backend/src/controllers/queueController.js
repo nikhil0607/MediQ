@@ -264,3 +264,20 @@ export const getAuditLogs = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+export const resetDemoData = async (req, res) => {
+  try {
+    const role = (req.headers["x-user-role"] || "").toLowerCase();
+    if (role !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Demo data reset is restricted to Demo Administrators. Please switch to the Admin profile to reset demo data."
+      });
+    }
+
+    const result = store.resetDemoData();
+    res.json({ success: true, message: result.message });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};

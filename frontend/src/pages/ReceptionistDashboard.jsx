@@ -6,6 +6,7 @@ import { useNotification } from "../context/NotificationContext";
 import { NewPatientModal } from "../components/queue/NewPatientModal";
 import { TokenReceiptModal } from "../components/queue/TokenReceiptModal";
 import { PriorityModal } from "../components/queue/PriorityModal";
+import { DoctorDelayModal } from "../components/queue/DoctorDelayModal";
 import { ConfirmationModal } from "../components/common/ConfirmationModal";
 import {
   Activity,
@@ -60,6 +61,8 @@ export function ReceptionistDashboard() {
     updateTokenPriority,
     pauseDoctorQueue,
     resumeDoctorQueue,
+    setDoctorDelay,
+    resetDemoData,
     lastEvent
   } = useQueue();
 
@@ -71,6 +74,7 @@ export function ReceptionistDashboard() {
   const [showNewModal, setShowNewModal] = useState(false);
   const [receiptToken, setReceiptToken] = useState(null);
   const [priorityToken, setPriorityToken] = useState(null);
+  const [selectedDelayDoctor, setSelectedDelayDoctor] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState({
     isOpen: false,
     title: "",
@@ -766,6 +770,20 @@ export function ReceptionistDashboard() {
                           <Pause className="w-3.5 h-3.5" />
                         </button>
                       )}
+
+                      {/* Doctor Delay Trigger */}
+                      <button
+                        onClick={() => setSelectedDelayDoctor(doc)}
+                        className={`px-2.5 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer flex items-center gap-1 ${
+                          isDelayed
+                            ? "bg-amber-100 text-amber-900 border-amber-300 shadow-2xs"
+                            : "bg-white hover:bg-amber-50 text-amber-800 border-amber-200"
+                        }`}
+                        title="Declare / Adjust Doctor Delay"
+                      >
+                        <Clock className="w-3.5 h-3.5 text-amber-600" />
+                        <span>{isDelayed ? `+${doc.currentDelayMins}m` : "Delay"}</span>
+                      </button>
                     </div>
                   </div>
                 );
@@ -1124,6 +1142,23 @@ export function ReceptionistDashboard() {
           token={priorityToken}
           onClose={() => setPriorityToken(null)}
           onSave={updateTokenPriority}
+        />
+      )}
+
+      {/* Doctor Delay Modal */}
+      {selectedDelayDoctor && (
+        <DoctorDelayModal
+          doctor={selectedDelayDoctor}
+          onClose={() => setSelectedDelayDoctor(null)}
+          onSave={async (docId, mins, reason) => {
+            await setDoctorDelay(docId, mins, reason);
+            setSelectedDelayDoctor(null);
+            showToast({
+              title: "Doctor Delay Updated",
+              message: `Set ${mins} min delay for Dr. ${selectedDelayDoctor.name}. Patient ETAs adjusted dynamically.`,
+              type: mins > 0 ? "warning" : "success"
+            });
+          }}
         />
       )}
 

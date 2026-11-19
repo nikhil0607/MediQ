@@ -26,7 +26,7 @@ export function LoginPage() {
   const [selectedRole, setSelectedRole] = useState("receptionist");
   const [error, setError] = useState("");
 
-  const destinationPath = (role, doctorId) => {
+  const destinationPath = (role, doctorId, tokenNumber) => {
     // If user originally tried to navigate somewhere specific
     if (location.state?.from?.pathname) {
       return location.state.from.pathname;
@@ -36,6 +36,9 @@ export function LoginPage() {
     }
     if (role === "admin") {
       return "/settings";
+    }
+    if (role === "patient") {
+      return `/track/${tokenNumber || "GEN-103"}`;
     }
     return "/receptionist";
   };
@@ -68,7 +71,7 @@ export function LoginPage() {
       message: `Signed in as Demo ${profile.role.toUpperCase()} (${profile.name})`,
       type: "info"
     });
-    navigate(destinationPath(profile.role, profile.doctorId));
+    navigate(destinationPath(profile.role, profile.doctorId, profile.tokenNumber));
   };
 
   return (
@@ -111,7 +114,7 @@ export function LoginPage() {
             >
               <div className="flex items-center gap-2">
                 <Users className="w-3.5 h-3.5 text-teal-600" />
-                <span>Demo Receptionist: Pooja Verma (Wing A)</span>
+                <span>Demo Receptionist: Pooja Verma (MediQ Care Centre)</span>
               </div>
               <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
             </button>
@@ -123,31 +126,31 @@ export function LoginPage() {
             >
               <div className="flex items-center gap-2">
                 <Stethoscope className="w-3.5 h-3.5 text-teal-600" />
-                <span>Demo Doctor: Dr. Ananya Sharma (Cabin 102)</span>
+                <span>Demo Doctor 1: Dr. Sharma — General Physician (Cabin 102)</span>
               </div>
               <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
             </button>
 
             <button
               type="button"
-              onClick={() => handleQuickDemo("doctor_iyer")}
-              className="w-full px-3 py-2 bg-white hover:bg-amber-100/60 border border-amber-200/80 rounded-xl text-xs font-semibold text-slate-800 flex items-center justify-between transition cursor-pointer shadow-2xs"
-            >
-              <div className="flex items-center gap-2">
-                <Stethoscope className="w-3.5 h-3.5 text-amber-600" />
-                <span>Demo Doctor: Dr. Rajesh V. Iyer (Cabin 204 - Delayed)</span>
-              </div>
-              <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickDemo("doctor_nair")}
+              onClick={() => handleQuickDemo("doctor_mehta")}
               className="w-full px-3 py-2 bg-white hover:bg-amber-100/60 border border-amber-200/80 rounded-xl text-xs font-semibold text-slate-800 flex items-center justify-between transition cursor-pointer shadow-2xs"
             >
               <div className="flex items-center gap-2">
                 <Stethoscope className="w-3.5 h-3.5 text-teal-600" />
-                <span>Demo Doctor: Dr. Priya Nair (Cabin 108 - Pediatrics)</span>
+                <span>Demo Doctor 2: Dr. Mehta — Dermatologist (Cabin 105)</span>
+              </div>
+              <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleQuickDemo("patient")}
+              className="w-full px-3 py-2 bg-white hover:bg-amber-100/60 border border-amber-200/80 rounded-xl text-xs font-semibold text-slate-800 flex items-center justify-between transition cursor-pointer shadow-2xs"
+            >
+              <div className="flex items-center gap-2">
+                <Users className="w-3.5 h-3.5 text-teal-700" />
+                <span>Demo Patient: Amit Kumar (Pass: GEN-103)</span>
               </div>
               <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
             </button>
@@ -158,8 +161,8 @@ export function LoginPage() {
               className="w-full px-3 py-2 bg-white hover:bg-amber-100/60 border border-amber-200/80 rounded-xl text-xs font-semibold text-slate-800 flex items-center justify-between transition cursor-pointer shadow-2xs"
             >
               <div className="flex items-center gap-2">
-                <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
-                <span>Demo Administrator: Dr. Arvind Swaminathan</span>
+                <ShieldCheck className="w-3.5 h-3.5 text-slate-700" />
+                <span>Demo Administrator: Dr. Arvind Swaminathan (Reset Controls)</span>
               </div>
               <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
             </button>

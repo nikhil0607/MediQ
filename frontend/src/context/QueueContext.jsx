@@ -251,6 +251,14 @@ export function QueueProvider({ children }) {
     return res;
   };
 
+  const resetDemoData = async () => {
+    const res = await api.resetDemoData();
+    if (res.success) {
+      await loadData();
+    }
+    return res;
+  };
+
   return (
     <QueueContext.Provider
       value={{
@@ -262,6 +270,7 @@ export function QueueProvider({ children }) {
         isConnected,
         lastEvent,
         refresh: loadData,
+        resetDemoData,
         createToken,
         callNext,
         startConsultation,

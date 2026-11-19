@@ -71,94 +71,82 @@ class MediQStore {
 
   async seedInitialQueues() {
     const samplePatients = [
-      // Dr. Ananya Sharma (General Medicine)
+      // Doctor 1: Dr. Sharma (General Medicine) - Demo Scenario Anchor
       {
-        patientName: "Sunita Aggarwal",
+        patientName: "Rohan Sharma",
         patientPhone: "+91 98112 34567",
-        patientAge: 42,
-        patientGender: "Female",
-        appointmentType: "Routine Health Checkup",
-        priority: "NORMAL",
-        doctorId: "doc-1",
-        deptCode: "GEN",
-        status: "IN_CONSULTATION",
-        consultationStartedAt: new Date(Date.now() - 6 * 60 * 1000).toISOString(),
-        notes: "Routine quarterly wellness checkup & thyroid review"
-      },
-      {
-        patientName: "Rahul Mehra",
-        patientPhone: "+91 98234 56789",
-        patientAge: 29,
-        patientGender: "Male",
-        appointmentType: "General Consultation",
-        priority: "NORMAL",
-        doctorId: "doc-1",
-        deptCode: "GEN",
-        status: "WAITING",
-        notes: "Viral fever, throat irritation and body ache"
-      },
-      {
-        patientName: "Kausalya Devi",
-        patientPhone: "+91 98345 67890",
-        patientAge: 74,
-        patientGender: "Female",
-        appointmentType: "Follow-up Review",
-        priority: "SENIOR",
-        doctorId: "doc-1",
-        deptCode: "GEN",
-        status: "WAITING",
-        notes: "Hypertension prescription refill and blood sugar monitoring"
-      },
-      {
-        patientName: "Amit Singhania",
-        patientPhone: "+91 98456 78901",
         patientAge: 38,
         patientGender: "Male",
         appointmentType: "General Consultation",
         priority: "NORMAL",
         doctorId: "doc-1",
         deptCode: "GEN",
+        status: "IN_CONSULTATION",
+        consultationStartedAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+        notes: "Routine quarterly wellness checkup & blood pressure review"
+      },
+      {
+        patientName: "Priya Patel",
+        patientPhone: "+91 98234 56789",
+        patientAge: 27,
+        patientGender: "Female",
+        appointmentType: "General Consultation",
+        priority: "NORMAL",
+        doctorId: "doc-1",
+        deptCode: "GEN",
         status: "WAITING",
-        notes: "Mild fever and acute fatigue"
+        notes: "Mild fever and acute throat irritation"
+      },
+      {
+        patientName: "Amit Kumar",
+        patientPhone: "+91 98345 67890",
+        patientAge: 45,
+        patientGender: "Male",
+        appointmentType: "Follow-up Review",
+        priority: "NORMAL",
+        doctorId: "doc-1",
+        deptCode: "GEN",
+        status: "WAITING",
+        notes: "Seasonal allergy evaluation & prescription refill"
       },
 
-      // Dr. Rajesh V. Iyer (Cardiology) - Doctor with a 15 min delay
+      // Doctor 2: Dr. Mehta (Dermatology) - Second Active Queue
       {
-        patientName: "Ramesh Chandra Gupta",
+        patientName: "Neha Gupta",
         patientPhone: "+91 98567 89012",
-        patientAge: 68,
-        patientGender: "Male",
-        appointmentType: "Specialist Consultation",
+        patientAge: 32,
+        patientGender: "Female",
+        appointmentType: "General Consultation",
         priority: "NORMAL",
         doctorId: "doc-2",
-        deptCode: "CARD",
+        deptCode: "DERM",
         status: "IN_CONSULTATION",
         consultationStartedAt: new Date(Date.now() - 4 * 60 * 1000).toISOString(),
-        notes: "Post-angioplasty stent 3-month checkup"
+        notes: "Contact eczema consultation on palms"
       },
       {
-        patientName: "Deepa Krishnan",
+        patientName: "Vikram Singh",
         patientPhone: "+91 98678 90123",
-        patientAge: 51,
-        patientGender: "Female",
-        appointmentType: "Emergency Triage",
-        priority: "EMERGENCY",
-        doctorId: "doc-2",
-        deptCode: "CARD",
-        status: "WAITING",
-        notes: "Acute retrosternal chest pain & palpitation"
-      },
-      {
-        patientName: "Manpreet Singh Gill",
-        patientPhone: "+91 98789 01234",
-        patientAge: 62,
+        patientAge: 29,
         patientGender: "Male",
         appointmentType: "Specialist Consultation",
         priority: "NORMAL",
         doctorId: "doc-2",
-        deptCode: "CARD",
+        deptCode: "DERM",
         status: "WAITING",
-        notes: "TMT stress test and Holter monitoring review"
+        notes: "Skin allergy follow-up and topical ointment review"
+      },
+      {
+        patientName: "Ananya Verma",
+        patientPhone: "+91 98789 01234",
+        patientAge: 24,
+        patientGender: "Female",
+        appointmentType: "General Consultation",
+        priority: "NORMAL",
+        doctorId: "doc-2",
+        deptCode: "DERM",
+        status: "WAITING",
+        notes: "Acne checkup and dietary counseling"
       },
 
       // Dr. Priya Nair (Pediatrics)
@@ -439,6 +427,42 @@ class MediQStore {
     this.broadcast("DOCTOR_DELAY_CHANGED", { doctorId, delayMins, reason });
     this.broadcast("QUEUE_UPDATED", { doctorId });
     return doc;
+  }
+
+  resetDemoData() {
+    this.departments = [...initialDepartments];
+    this.doctors = JSON.parse(JSON.stringify(initialDoctors));
+    this.settings = { ...initialSettings };
+    this.tokens = [];
+    this.logs = [];
+    this.sequenceByDoctor = {};
+    this.tokenCounterByDept = {
+      GEN: 100,
+      CARD: 200,
+      PED: 300,
+      ORTHO: 400,
+      DERM: 500,
+      GYN: 600,
+      OPHTH: 700,
+      ENT: 800,
+      NEURO: 900,
+      PULMO: 1000
+    };
+
+    // Reseed initial fictional queues
+    this.seedInitialQueues();
+
+    this.logs.unshift({
+      id: `log-${Date.now()}`,
+      action: "DEMO_DATA_RESET",
+      notes: "Demo data reset to baseline scenario (MediQ Care Centre, Dr. Sharma, Dr. Mehta)",
+      performer: { role: "admin", name: "Demo Administrator" },
+      createdAt: new Date().toISOString()
+    });
+
+    this.broadcast("QUEUE_UPDATED", {});
+    this.broadcast("DOCTOR_UPDATED", {});
+    return { success: true, message: "Demo data successfully reset to scenario baseline." };
   }
 
   setDoctorAvailability(doctorId, status = "AVAILABLE", reason = "") {
