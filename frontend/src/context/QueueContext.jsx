@@ -95,6 +95,10 @@ export function QueueProvider({ children }) {
           } else if (event === "DOCTOR_PAUSE_TOGGLED") {
             const { doctorId, isPaused, pauseReason } = data;
             setDoctors(prev => prev.map(d => d.id === doctorId ? { ...d, isPaused, pauseReason } : d));
+          } else if (event === "DOCTOR_UPDATED") {
+            if (data && data.id) {
+              setDoctors(prev => prev.map(d => d.id === data.id ? { ...d, ...data } : d));
+            }
           } else if (event === "QUEUE_UPDATED") {
             api.getTokens().then(res => res.success && setTokens(res.data));
             api.getDoctors().then(res => res.success && setDoctors(res.data));
@@ -215,6 +219,14 @@ export function QueueProvider({ children }) {
     return res;
   };
 
+  const setDoctorAvailability = async (doctorId, status, reason) => {
+    const res = await api.setDoctorAvailability(doctorId, status, reason);
+    if (res.success) {
+      loadData();
+    }
+    return res;
+  };
+
   const pauseDoctorQueue = async (doctorId, reason) => {
     const res = await api.pauseDoctorQueue(doctorId, reason);
     if (res.success) {
@@ -260,6 +272,7 @@ export function QueueProvider({ children }) {
         cancelToken,
         updateTokenPriority,
         setDoctorDelay,
+        setDoctorAvailability,
         pauseDoctorQueue,
         resumeDoctorQueue,
         toggleDoctorPause

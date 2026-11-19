@@ -70,3 +70,21 @@ export const toggleDoctorPause = async (req, res) => {
   }
 };
 
+export const setDoctorAvailability = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, reason } = req.body;
+    const updated = store.setDoctorAvailability(id, status, reason);
+    if (!updated) {
+      return res.status(404).json({ success: false, message: "Doctor not found" });
+    }
+    res.json({
+      success: true,
+      message: `Doctor availability set to ${status}`,
+      data: updated
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+

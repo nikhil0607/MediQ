@@ -441,6 +441,26 @@ class MediQStore {
     return doc;
   }
 
+  setDoctorAvailability(doctorId, status = "AVAILABLE", reason = "") {
+    const doc = this.doctors.find(d => d.id === doctorId);
+    if (!doc) return null;
+
+    doc.status = status; // "AVAILABLE" or "UNAVAILABLE"
+    doc.availabilityReason = reason || "";
+
+    this.logs.unshift({
+      id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      doctorId,
+      action: "AVAILABILITY_CHANGED",
+      notes: `Doctor availability set to ${status}${reason ? ` (${reason})` : ""}`,
+      timestamp: new Date().toISOString()
+    });
+
+    this.broadcast("DOCTOR_UPDATED", doc);
+    this.broadcast("QUEUE_UPDATED", { doctorId });
+    return doc;
+  }
+
   toggleDoctorPause(doctorId, reason = "") {
     const doc = this.doctors.find(d => d.id === doctorId);
     if (!doc) return null;

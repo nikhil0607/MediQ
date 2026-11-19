@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { api } from "../services/api";
 import { supabase, isSupabaseConfigured } from "../services/supabase";
 import { sounds } from "../utils/audio";
+import { NotificationHistoryDrawer } from "../components/queue/NotificationHistoryDrawer";
 import {
   Activity,
   Clock,
@@ -23,7 +24,9 @@ import {
   ArrowRight,
   ShieldCheck,
   Sparkles,
-  PhoneCall
+  PhoneCall,
+  BellRing,
+  CheckCheck
 } from "lucide-react";
 
 export function PatientTrackPage() {
@@ -36,58 +39,276 @@ export function PatientTrackPage() {
   const [isLiveConnected, setIsLiveConnected] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date());
 
+  // Notification state
+  const [notifications, setNotifications] = useState([]);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [activeBanner, setActiveBanner] = useState(null);
+  const [browserPermission, setBrowserPermission] = useState(
+    typeof window !== "undefined" && "Notification" in window
+      ? Notification.permission
+      : "unsupported"
+  );
+
   const prevStatusRef = useRef(null);
   const prevEtaRef = useRef(null);
+  const wasPausedRef = useRef(null);
+  const firedKeysRef = useRef(new Set());
   const eventSourceRef = useRef(null);
 
-  // Fetch verified public queue pass from server (strictly privacy-safe)
-  const fetchPass = useCallback(async (isSilent = false) => {
+  // Load existing notifications and fired keys from localStorage
+  useEffect(() => {
     if (!tokenId) return;
-    if (!isSilent) setLoading(true);
-
     try {
-      // 1. Try dedicated public pass endpoint
-      let res;
-      try {
-        res = await api.getPublicPass(tokenId);
-      } catch (e) {
-        // Fallback to token lookup endpoint if pass endpoint is unavailable
-        res = await api.getTokenById(tokenId);
+      const storedNotifs = localStorage.getItem(`mediq_notifs_${tokenId}`);
+      if (storedNotifs) {
+        setNotifications(JSON.parse(storedNotifs));
+      }
+      const storedKeys = localStorage.getItem(`mediq_fired_${tokenId}`);
+      if (storedKeys) {
+        firedKeysRef.current = new Set(JSON.parse(storedKeys));
+      }
+    } catch (e) {
+      console.warn("Error restoring notification history:", e);
+    }
+  }, [tokenId]);
+
+  // Save notifications to localStorage when updated
+  const saveNotifications = useCallback(
+    (newNotifs) => {
+      setNotifications(newNotifs);
+      if (tokenId) {
+        try {
+          localStorage.setItem(`mediq_notifs_${tokenId}`, JSON.stringify(newNotifs));
+        } catch (e) {}
+      }
+    },
+    [tokenId]
+  );
+
+  // Dispatch a Smart Notification (with deduplication)
+  const dispatchSmartNotification = useCallback(
+    ({ eventKey, title, message, type }) => {
+      if (!eventKey || firedKeysRef.current.has(eventKey)) {
+        return; // Already fired! Prevent duplicate notifications.
       }
 
-      if (res && res.success && res.data) {
-        const data = res.data;
+      // Mark as fired
+      firedKeysRef.current.add(eventKey);
+      if (tokenId) {
+        try {
+          localStorage.setItem(
+            `mediq_fired_${tokenId}`,
+            JSON.stringify(Array.from(firedKeysRef.current))
+          );
+        } catch (e) {}
+      }
 
-        // Trigger sounds and haptic vibration on critical status transitions
-        if (prevStatusRef.current && prevStatusRef.current !== data.status) {
-          if (data.status === "CALLING" || data.queueStatus === "Next in Line") {
-            if (audioEnabled) sounds.playCallChime();
-            sounds.vibrate([300, 150, 300, 150, 500]);
-          } else if (data.queueStatus === "Almost Your Turn") {
-            if (audioEnabled) sounds.playNotice();
-            sounds.vibrate([200, 100, 200]);
-          } else if (data.status === "IN_CONSULTATION") {
-            if (audioEnabled) sounds.playNotice();
-          }
+      const newNotif = {
+        id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+        eventKey,
+        title,
+        message,
+        type, // "urgent" | "warning" | "info" | "delay" | "resume"
+        timestamp: new Date().toISOString(),
+        read: false
+      };
+
+      // Add to notifications
+      setNotifications((prev) => {
+        const updated = [newNotif, ...prev];
+        if (tokenId) {
+          try {
+            localStorage.setItem(`mediq_notifs_${tokenId}`, JSON.stringify(updated));
+          } catch (e) {}
+        }
+        return updated;
+      });
+
+      // Show temporary floating in-app banner
+      setActiveBanner(newNotif);
+      setTimeout(() => {
+        setActiveBanner((current) => (current?.id === newNotif.id ? null : current));
+      }, 7000);
+
+      // Play audio chime
+      if (audioEnabled) {
+        if (type === "urgent") {
+          sounds.playCallChime();
+          sounds.vibrate([300, 150, 300, 150, 500]);
+        } else {
+          sounds.playNotice();
+          sounds.vibrate([200, 100, 200]);
+        }
+      }
+
+      // Web Browser Notification if permission granted
+      if (
+        typeof window !== "undefined" &&
+        "Notification" in window &&
+        Notification.permission === "granted"
+      ) {
+        try {
+          new Notification(title, {
+            body: message,
+            icon: "/favicon.ico"
+          });
+        } catch (err) {
+          console.warn("Browser notification dispatch failed:", err);
+        }
+      }
+    },
+    [tokenId, audioEnabled]
+  );
+
+  // Request browser notification permission explicitly
+  const requestBrowserPermission = async () => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      alert("Web browser notifications are not supported on this browser.");
+      return;
+    }
+    try {
+      const permission = await Notification.requestPermission();
+      setBrowserPermission(permission);
+      if (permission === "granted") {
+        new Notification("MediQ Alerts Enabled", {
+          body: "You will receive real-time queue notifications directly on your screen.",
+          icon: "/favicon.ico"
+        });
+      }
+    } catch (e) {
+      console.warn("Notification request error:", e);
+    }
+  };
+
+  // Process smart notification rules on queue state change
+  const processNotificationTriggers = useCallback(
+    (data) => {
+      if (!data || !data.tokenNumber) return;
+
+      const isCompleted = data.status === "COMPLETED" || data.queueStatus === "Completed";
+      const isConsulting = data.status === "IN_CONSULTATION" || data.queueStatus === "Consulting";
+      const isCalling = data.status === "CALLING" || data.status === "CALLED" || data.queueStatus === "Next in Line";
+      const patientsAhead = data.eta?.patientsAhead ?? 0;
+      const docName = data.doctor?.name || "the Doctor";
+      const cabinNum = data.doctor?.cabinNumber || "assigned cabin";
+      const delayMins = data.doctor?.currentDelayMins || data.eta?.delayMinutes || 0;
+      const isPaused = Boolean(data.doctor?.isPaused);
+
+      // Rule 1: 5 patients ahead
+      if (!isCompleted && !isConsulting && !isCalling && patientsAhead === 5) {
+        dispatchSmartNotification({
+          eventKey: `5_ahead_${data.tokenNumber}`,
+          title: "5 Patients Ahead",
+          message: `There are 5 patients ahead in ${docName}'s queue. Estimated wait is ${data.eta?.formattedRange || "approaching"}.`,
+          type: "info"
+        });
+      }
+
+      // Rule 2: 2 patients ahead
+      if (!isCompleted && !isConsulting && !isCalling && patientsAhead === 2) {
+        dispatchSmartNotification({
+          eventKey: `2_ahead_${data.tokenNumber}`,
+          title: "2 Patients Ahead",
+          message: `Your turn is approaching! Only 2 patients ahead of you. Please stay close to ${cabinNum}.`,
+          type: "info"
+        });
+      }
+
+      // Rule 3: Your turn is approaching (1 patient ahead or "Almost Your Turn")
+      if (!isCompleted && !isConsulting && !isCalling && (patientsAhead === 1 || data.queueStatus === "Almost Your Turn")) {
+        dispatchSmartNotification({
+          eventKey: `approaching_${data.tokenNumber}`,
+          title: "Your Turn is Approaching",
+          message: `Only 1 patient remains ahead. Please move toward ${cabinNum}.`,
+          type: "warning"
+        });
+      }
+
+      // Rule 4: You are next (0 patients ahead in waiting status)
+      if (!isCompleted && !isConsulting && !isCalling && data.status === "WAITING" && (patientsAhead === 0 || data.queueStatus === "Next in Line")) {
+        dispatchSmartNotification({
+          eventKey: `you_are_next_${data.tokenNumber}`,
+          title: "You Are Next",
+          message: `You are next in line! You will be called into ${cabinNum} momentarily.`,
+          type: "warning"
+        });
+      }
+
+      // Rule 5: Your turn has arrived (Status is CALLING / CALLED)
+      if (isCalling) {
+        dispatchSmartNotification({
+          eventKey: `turn_arrived_${data.tokenNumber}_${data.calledAt || "calling"}`,
+          title: "Your Turn Has Arrived!",
+          message: `Please proceed immediately to ${cabinNum}. ${docName} is ready for your consultation.`,
+          type: "urgent"
+        });
+      }
+
+      // Rule 6: Doctor is delayed
+      if (!isCompleted && !isConsulting && delayMins > 0) {
+        dispatchSmartNotification({
+          eventKey: `delay_${data.tokenNumber}_${delayMins}`,
+          title: `Doctor Delayed (+${delayMins}m)`,
+          message: `${docName} has announced a ${delayMins}-minute schedule delay (${data.doctor?.delayReason || "Extended Procedure"}). Your ETA has been updated.`,
+          type: "delay"
+        });
+      }
+
+      // Rule 7: Queue has resumed
+      if (wasPausedRef.current === true && !isPaused) {
+        dispatchSmartNotification({
+          eventKey: `resumed_${data.tokenNumber}_${Date.now()}`,
+          title: "Queue Has Resumed",
+          message: `${docName}'s consultation room has resumed calling patients.`,
+          type: "resume"
+        });
+      }
+
+      // Record paused state for transition detection
+      wasPausedRef.current = isPaused;
+    },
+    [dispatchSmartNotification]
+  );
+
+  // Fetch verified public queue pass from server (strictly privacy-safe)
+  const fetchPass = useCallback(
+    async (isSilent = false) => {
+      if (!tokenId) return;
+      if (!isSilent) setLoading(true);
+
+      try {
+        let res;
+        try {
+          res = await api.getPublicPass(tokenId);
+        } catch (e) {
+          res = await api.getTokenById(tokenId);
         }
 
-        prevStatusRef.current = data.status;
-        prevEtaRef.current = data.eta;
-        setPass(data);
-        setError("");
-        setLastUpdated(new Date());
-      } else {
-        setError(res?.message || "Queue pass not found or expired.");
+        if (res && res.success && res.data) {
+          const data = res.data;
+
+          // Process all 7 Smart Notification Rules
+          processNotificationTriggers(data);
+
+          prevStatusRef.current = data.status;
+          prevEtaRef.current = data.eta;
+          setPass(data);
+          setError("");
+          setLastUpdated(new Date());
+        } else {
+          setError(res?.message || "Queue pass not found or expired.");
+        }
+      } catch (err) {
+        console.warn("Pass fetch notice:", err);
+        if (!isSilent) {
+          setError("Invalid or expired queue pass identifier.");
+        }
+      } finally {
+        if (!isSilent) setLoading(false);
       }
-    } catch (err) {
-      console.warn("Pass fetch notice:", err);
-      if (!isSilent) {
-        setError("Invalid or expired queue pass identifier.");
-      }
-    } finally {
-      if (!isSilent) setLoading(false);
-    }
-  }, [tokenId, audioEnabled]);
+    },
+    [tokenId, processNotificationTriggers]
+  );
 
   // Initial load
   useEffect(() => {
@@ -137,7 +358,6 @@ export function PatientTrackPage() {
         try {
           const payload = JSON.parse(e.data);
           if (payload && payload.event) {
-            // Whenever an event occurs that might affect this queue, refresh pass silently
             fetchPass(true);
           }
         } catch {
@@ -179,6 +399,22 @@ export function PatientTrackPage() {
     sounds.vibrate([200, 100, 200]);
   };
 
+  const handleMarkAsRead = (notifId) => {
+    const updated = notifications.map((n) =>
+      n.id === notifId ? { ...n, read: true } : n
+    );
+    saveNotifications(updated);
+  };
+
+  const handleMarkAllAsRead = () => {
+    const updated = notifications.map((n) => ({ ...n, read: true }));
+    saveNotifications(updated);
+  };
+
+  const handleClearAll = () => {
+    saveNotifications([]);
+  };
+
   // Format registration time nicely
   const formatTime = (isoString) => {
     if (!isoString) return "Today";
@@ -189,6 +425,8 @@ export function PatientTrackPage() {
       return "Today";
     }
   };
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   // If loading initially
   if (loading && !pass) {
@@ -245,8 +483,8 @@ export function PatientTrackPage() {
 
   // Compute status helpers
   const queueStatus = pass.queueStatus || "Waiting";
-  const isCalling = pass.status === "CALLING" || queueStatus === "Next in Line";
-  const isConsulting = pass.status === "IN_CONSULTATION" || queueStatus === "Consulting";
+  const isCalling = pass.status === "CALLING" || pass.status === "CALLED" || queueStatus === "Next in Line";
+  const isConsulting = pass.status === "IN_CONSULTATION" || pass.status === "CONSULTING" || queueStatus === "Consulting";
   const isCompleted = pass.status === "COMPLETED" || queueStatus === "Completed";
   const isSkipped = pass.status === "SKIPPED" || queueStatus === "Skipped";
   const isDelayed = Boolean(pass.doctor?.currentDelayMins > 0 || pass.eta?.isDelayed || queueStatus === "Delayed");
@@ -318,7 +556,7 @@ export function PatientTrackPage() {
 
   const statusConfig = getStatusBadgeConfig();
 
-  // Progress Stepper calculation (5 milestone stages)
+  // Progress Stepper calculation (6 milestone stages)
   const getProgressStageIndex = () => {
     if (isCompleted) return 5;
     if (isConsulting) return 4;
@@ -364,8 +602,22 @@ export function PatientTrackPage() {
             </div>
           </div>
 
-          {/* Audio Chime & Share Controls */}
+          {/* Smart Notification Drawer Button, Audio Chime & Share Controls */}
           <div className="flex items-center gap-1.5">
+            {/* Notification Center Trigger with Unread Count Badge */}
+            <button
+              onClick={() => setIsDrawerOpen(true)}
+              className="relative p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 transition cursor-pointer"
+              title="View Notification History"
+            >
+              <Bell className="w-4 h-4 text-slate-700" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center animate-pulse">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+
             <button
               onClick={() => setAudioEnabled(!audioEnabled)}
               className={`p-2 rounded-xl transition cursor-pointer border ${
@@ -389,7 +641,73 @@ export function PatientTrackPage() {
         </div>
       </header>
 
+      {/* Floating Active Smart Alert Banner */}
+      {activeBanner && (
+        <div className="w-full max-w-md px-4 pt-3 animate-slide-down">
+          <div className="p-3.5 bg-slate-900 text-white rounded-2xl shadow-xl flex items-start justify-between gap-3 border border-slate-800">
+            <div className="flex items-start gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center shrink-0 mt-0.5">
+                <BellRing className="w-4 h-4 animate-bounce" />
+              </div>
+              <div>
+                <h4 className="font-bold text-xs text-white flex items-center gap-1.5">
+                  <span>{activeBanner.title}</span>
+                  <span className="text-[10px] text-teal-300 bg-teal-900/60 px-1.5 py-0.2 rounded font-normal">
+                    Now
+                  </span>
+                </h4>
+                <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
+                  {activeBanner.message}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setActiveBanner(null)}
+              className="text-slate-400 hover:text-white p-1 cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       <main className="w-full max-w-md px-4 pt-4 space-y-4">
+        {/* Browser Notification Permission Pill / Request Box */}
+        <div className="bg-white rounded-2xl p-3 border border-slate-200 text-xs flex items-center justify-between gap-2 shadow-2xs">
+          <div className="flex items-center gap-2 min-w-0">
+            <Bell className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+            <div className="truncate text-slate-700">
+              {browserPermission === "granted" ? (
+                <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-600 inline" />
+                  Browser Push Alerts Active
+                </span>
+              ) : browserPermission === "denied" ? (
+                <span className="text-slate-500">
+                  Browser Push Alerts: Blocked in Settings
+                </span>
+              ) : browserPermission === "unsupported" ? (
+                <span className="text-slate-500">
+                  Browser Alerts not supported on this browser
+                </span>
+              ) : (
+                <span className="text-slate-700">
+                  Get notified when your turn approaches
+                </span>
+              )}
+            </div>
+          </div>
+
+          {browserPermission === "default" && (
+            <button
+              onClick={requestBrowserPermission}
+              className="px-2.5 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-[11px] font-bold shadow-xs transition shrink-0 cursor-pointer"
+            >
+              Enable Alerts
+            </button>
+          )}
+        </div>
+
         {/* Calling Alert Banner (When turn arrives!) */}
         {isCalling && (
           <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 text-white p-5 rounded-3xl shadow-xl shadow-amber-500/25 animate-bounce-subtle space-y-2 text-center">
@@ -615,22 +933,31 @@ export function PatientTrackPage() {
           </div>
         </div>
 
-        {/* Audio Test & Instructions Footer Card */}
+        {/* Audio Test & Notification History Footer Card */}
         <div className="bg-white rounded-2xl p-4 border border-slate-200 text-xs text-slate-600 space-y-2.5">
           <div className="flex items-center justify-between font-bold text-slate-800">
             <span className="flex items-center gap-1.5">
               <Bell className="w-3.5 h-3.5 text-teal-600" />
-              <span>Waiting Room Notifications</span>
+              <span>Waiting Room Notifications ({notifications.length})</span>
             </span>
-            <button
-              onClick={handleTestChime}
-              className="text-[11px] text-teal-700 hover:text-teal-800 font-bold underline cursor-pointer"
-            >
-              Test Hospital Chime
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsDrawerOpen(true)}
+                className="text-[11px] text-teal-700 hover:text-teal-800 font-bold underline cursor-pointer"
+              >
+                View History
+              </button>
+              <span>•</span>
+              <button
+                onClick={handleTestChime}
+                className="text-[11px] text-slate-600 hover:text-slate-900 font-medium underline cursor-pointer"
+              >
+                Test Sound
+              </button>
+            </div>
           </div>
           <p className="text-[11px] leading-relaxed text-slate-600">
-            Keep this digital pass open on your phone. When Dr. {pass.doctor?.name?.split(" ")[1] || "Sharma"} calls your token, your screen will light up, sound a gentle hospital chime, and vibrate.
+            Keep this digital pass open on your phone. You will receive smart alerts when 5 or 2 patients remain, when your turn is approaching, or if the doctor experiences a delay.
           </p>
         </div>
 
@@ -640,6 +967,16 @@ export function PatientTrackPage() {
           <span>Last sync: {lastUpdated.toLocaleTimeString()}</span>
         </div>
       </main>
+
+      {/* Notification History Slide-Over Drawer */}
+      <NotificationHistoryDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        notifications={notifications}
+        onMarkAsRead={handleMarkAsRead}
+        onMarkAllAsRead={handleMarkAllAsRead}
+        onClearAll={handleClearAll}
+      />
     </div>
   );
 }

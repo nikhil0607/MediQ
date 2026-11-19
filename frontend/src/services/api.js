@@ -112,6 +112,10 @@ export const api = {
     method: "POST",
     body: JSON.stringify({ delayMins, reason })
   }),
+  setDoctorAvailability: (id, status, reason) => request(`/doctors/${id}/availability`, {
+    method: "POST",
+    body: JSON.stringify({ status, reason })
+  }),
   toggleDoctorPause: (id) => request(`/doctors/${id}/toggle-pause`, {
     method: "POST"
   }),
