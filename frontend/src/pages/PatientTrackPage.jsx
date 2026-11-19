@@ -489,11 +489,11 @@ export function PatientTrackPage() {
               <div className="text-[10px] font-semibold text-slate-500 uppercase flex items-center justify-center gap-1">
                 <Clock className="w-3 h-3 text-teal-600" /> Wait
               </div>
-              <div className="text-xl font-black text-teal-700 font-mono mt-1">
-                {isCompleted ? "0m" : isConsulting ? "Inside" : `~${pass.eta?.estimatedWaitMinutes ?? 12}m`}
+              <div className="text-lg sm:text-xl font-black text-teal-700 font-mono mt-1">
+                {isCompleted ? "0m" : isConsulting ? "Inside" : pass.eta?.minWaitMinutes ? `${pass.eta.minWaitMinutes}–${pass.eta.maxWaitMinutes}m` : `~${pass.eta?.estimatedWaitMinutes ?? 12}m`}
               </div>
               <div className="text-[10px] text-slate-500">
-                {isDelayed ? "Delay Adj." : "Est. Wait"}
+                {isDelayed ? "Delay Adj." : "Est. Range"}
               </div>
             </div>
 
@@ -521,6 +521,22 @@ export function PatientTrackPage() {
               <div className="text-[10px] text-slate-500">Cabin Active</div>
             </div>
           </div>
+
+          {/* Dynamic ETA Approximation Range Banner */}
+          {!isCompleted && !isConsulting && (
+            <div className="p-3 bg-teal-50/70 rounded-2xl border border-teal-200/80 text-center space-y-1">
+              <div className="text-xs font-extrabold text-teal-900 flex items-center justify-center gap-1.5 flex-wrap">
+                <Clock className="w-3.5 h-3.5 text-teal-700" />
+                <span>ETA:</span>
+                <span className="text-teal-800 bg-white px-2 py-0.5 rounded-lg border border-teal-200 font-mono">
+                  {pass.eta?.formattedRange || `Approximately ${pass.eta?.estimatedWaitMinutes || 15} minutes`}
+                </span>
+              </div>
+              <div className="text-[10px] text-teal-700 font-medium">
+                Dynamic estimate based on doctor pace ({pass.eta?.doctorPace?.tAvg || pass.doctor?.avgConsultationMins || 12}m/patient) &amp; {pass.eta?.patientsAhead || 0} waiting ahead
+              </div>
+            </div>
+          )}
 
           {/* Doctor & Room Card */}
           <div className="p-3.5 bg-teal-50/50 rounded-2xl border border-teal-100 flex items-center gap-3">

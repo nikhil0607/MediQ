@@ -947,10 +947,10 @@ export function ReceptionistDashboard() {
                               <span className="text-amber-700 font-bold">Summoned</span>
                             ) : isWaiting ? (
                               <div>
-                                <span className="font-bold text-slate-900">
-                                  ~{token.eta?.estimatedWaitMinutes || 10} mins
+                                <span className="font-bold text-slate-900" title={token.eta?.formattedRange || ""}>
+                                  {token.eta?.minWaitMinutes ? `${token.eta.minWaitMinutes}–${token.eta.maxWaitMinutes}m` : `~${token.eta?.estimatedWaitMinutes || 10}m`}
                                 </span>
-                                <div className="text-[10px] text-slate-400">
+                                <div className="text-[10px] text-slate-500">
                                   {token.eta?.patientsAhead || 0} ahead
                                 </div>
                               </div>

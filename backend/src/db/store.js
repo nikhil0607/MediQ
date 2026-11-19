@@ -24,8 +24,32 @@ class MediQStore {
       PULMO: 1000
     };
 
+    // Sequential queue sequence tracker per doctor
+    this.sequenceByDoctor = {};
+
+    // Concurrency locks to prevent race conditions during simultaneous queue operations
+    this.locks = new Map();
+
     // Populate initial realistic active queues with Indian names
     this.seedInitialQueues();
+  }
+
+  // Concurrency Lock: Prevents conflicting queue mutations for the same doctor
+  async withDoctorLock(doctorId, fn) {
+    const key = String(doctorId);
+    const start = Date.now();
+    while (this.locks.has(key)) {
+      if (Date.now() - start > 6000) {
+        throw new Error("Queue lock timeout: another staff operation is currently modifying this doctor's queue. Please retry.");
+      }
+      await new Promise(r => setTimeout(r, 20));
+    }
+    this.locks.set(key, true);
+    try {
+      return await fn();
+    } finally {
+      this.locks.delete(key);
+    }
   }
 
   // Subscribe to real-time events (SSE)
@@ -240,7 +264,10 @@ class MediQStore {
       const tokenNumber = `${p.deptCode}-${this.tokenCounterByDept[p.deptCode]}`;
       const id = `tok-${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 6)}`;
       const passToken = `pass_${crypto.randomBytes(12).toString("hex")}`;
-      
+
+      this.sequenceByDoctor[p.doctorId] = (this.sequenceByDoctor[p.doctorId] || 0) + 1;
+      const queueSequenceNumber = this.sequenceByDoctor[p.doctorId];
+
       const clientBase = process.env.CLIENT_URL || "http://localhost:5173";
       const qrData = `${clientBase}/track/${passToken}`;
       let qrCodeData = "";
@@ -254,10 +281,13 @@ class MediQStore {
         // ignore
       }
 
+      const regTime = new Date(Date.now() - Math.floor(Math.random() * 40 + 10) * 60 * 1000).toISOString();
+
       this.tokens.push({
         id,
         passToken,
         tokenNumber,
+        queueSequenceNumber,
         doctorId: p.doctorId,
         patientName: p.patientName,
         patientPhone: p.patientPhone,
@@ -274,7 +304,72 @@ class MediQStore {
         qrCodeData,
         trackingUrl: qrData,
         notes: p.notes || "",
-        createdAt: new Date(Date.now() - Math.floor(Math.random() * 40 + 10) * 60 * 1000).toISOString()
+        registeredAt: regTime,
+        createdAt: regTime
+      });
+    }
+
+    // Seed earlier completed consultations so doctor pace has realistic historical samples
+    const completedSamples = [
+      {
+        patientName: "Gopal Subramanian",
+        doctorId: "doc-1",
+        deptCode: "GEN",
+        appointmentType: "Follow-up Review",
+        startMinsAgo: 38,
+        durationMins: 11
+      },
+      {
+        patientName: "Preeti Chawla",
+        doctorId: "doc-1",
+        deptCode: "GEN",
+        appointmentType: "General Consultation",
+        startMinsAgo: 24,
+        durationMins: 13
+      },
+      {
+        patientName: "Harishankar Trivedi",
+        doctorId: "doc-2",
+        deptCode: "CARD",
+        appointmentType: "ECG Review",
+        startMinsAgo: 35,
+        durationMins: 16
+      }
+    ];
+
+    for (const c of completedSamples) {
+      this.tokenCounterByDept[c.deptCode] = (this.tokenCounterByDept[c.deptCode] || 100) + 1;
+      const tokenNumber = `${c.deptCode}-${this.tokenCounterByDept[c.deptCode]}`;
+      const id = `tok-${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 6)}`;
+      const passToken = `pass_${crypto.randomBytes(12).toString("hex")}`;
+
+      const started = new Date(Date.now() - c.startMinsAgo * 60000).toISOString();
+      const completed = new Date(Date.now() - (c.startMinsAgo - c.durationMins) * 60000).toISOString();
+
+      this.tokens.push({
+        id,
+        passToken,
+        tokenNumber,
+        queueSequenceNumber: (this.sequenceByDoctor[c.doctorId] = (this.sequenceByDoctor[c.doctorId] || 0) + 1),
+        doctorId: c.doctorId,
+        patientName: c.patientName,
+        patientPhone: "+91 98000 00000",
+        patientAge: 45,
+        patientGender: "Other",
+        appointmentType: c.appointmentType,
+        priority: "NORMAL",
+        status: "COMPLETED",
+        consultationStartedAt: started,
+        calledAt: started,
+        completedAt: completed,
+        actualDurationMins: c.durationMins,
+        skippedAt: null,
+        recalledAt: null,
+        qrCodeData: "",
+        trackingUrl: `${process.env.CLIENT_URL || "http://localhost:5173"}/track/${passToken}`,
+        notes: "Completed routine visit",
+        registeredAt: new Date(Date.now() - (c.startMinsAgo + 10) * 60000).toISOString(),
+        createdAt: new Date(Date.now() - (c.startMinsAgo + 10) * 60000).toISOString()
       });
     }
 
@@ -408,66 +503,80 @@ class MediQStore {
     appointmentType = "General Consultation",
     doctorId,
     priority = "NORMAL",
-    notes = ""
+    notes = "",
+    performedBy = { role: "receptionist", name: "Frontdesk" }
   }) {
     const doctor = this.doctors.find(d => d.id === doctorId);
     if (!doctor) throw new Error("Doctor not found");
 
-    const dept = this.departments.find(dp => dp.id === doctor.departmentId) || { code: "GEN" };
-    this.tokenCounterByDept[dept.code] = (this.tokenCounterByDept[dept.code] || 100) + 1;
-    const tokenNumber = `${dept.code}-${this.tokenCounterByDept[dept.code]}`;
-    const id = `tok-${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 6)}`;
-    
-    // Cryptographically unpredictable queue pass identifier
-    const passToken = `pass_${crypto.randomBytes(12).toString("hex")}`;
-    const clientBase = process.env.CLIENT_URL || "http://localhost:5173";
-    const trackingUrl = `${clientBase}/track/${passToken}`;
+    return this.withDoctorLock(doctorId, async () => {
+      const dept = this.departments.find(dp => dp.id === doctor.departmentId) || { code: "GEN" };
+      this.tokenCounterByDept[dept.code] = (this.tokenCounterByDept[dept.code] || 100) + 1;
+      const tokenNumber = `${dept.code}-${this.tokenCounterByDept[dept.code]}`;
+      const id = `tok-${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 6)}`;
 
-    const qrCodeData = await QRCode.toDataURL(trackingUrl, {
-      width: 320,
-      margin: 1,
-      color: { dark: "#0f172a", light: "#ffffff" }
+      // Cryptographically unpredictable queue pass identifier
+      const passToken = `pass_${crypto.randomBytes(12).toString("hex")}`;
+      const clientBase = process.env.CLIENT_URL || "http://localhost:5173";
+      const trackingUrl = `${clientBase}/track/${passToken}`;
+
+      // Strictly sequential queue position for this doctor
+      this.sequenceByDoctor[doctorId] = (this.sequenceByDoctor[doctorId] || 0) + 1;
+      const queueSequenceNumber = this.sequenceByDoctor[doctorId];
+
+      const qrCodeData = await QRCode.toDataURL(trackingUrl, {
+        width: 320,
+        margin: 1,
+        color: { dark: "#0f172a", light: "#ffffff" }
+      });
+
+      const now = new Date().toISOString();
+      const token = {
+        id,
+        passToken,
+        tokenNumber,
+        queueSequenceNumber,
+        doctorId,
+        patientName,
+        patientPhone: patientPhone || "",
+        patientAge: patientAge ? Number(patientAge) : null,
+        patientGender: patientGender || "Other",
+        appointmentType: appointmentType || "General Consultation",
+        priority,
+        status: "WAITING",
+        consultationStartedAt: null,
+        calledAt: null,
+        completedAt: null,
+        skippedAt: null,
+        recalledAt: null,
+        qrCodeData,
+        trackingUrl,
+        notes,
+        registeredAt: now,
+        createdAt: now
+      };
+
+      this.tokens.push(token);
+
+      this.logs.unshift({
+        id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        tokenId: id,
+        tokenNumber,
+        doctorId,
+        action: "REGISTERED",
+        previousStatus: "NONE",
+        newStatus: "WAITING",
+        performedBy,
+        notes: `Token ${tokenNumber} (Seq #${queueSequenceNumber}) issued to ${patientName} (${appointmentType})`,
+        timestamp: now
+      });
+
+      const enrichedToken = this.enrichToken(token);
+      this.broadcast("TOKEN_CREATED", { token: enrichedToken, doctorId });
+      this.broadcast("QUEUE_UPDATED", { doctorId });
+
+      return enrichedToken;
     });
-
-    const token = {
-      id,
-      passToken,
-      tokenNumber,
-      doctorId,
-      patientName,
-      patientPhone: patientPhone || "",
-      patientAge: patientAge ? Number(patientAge) : null,
-      patientGender: patientGender || "Other",
-      appointmentType: appointmentType || "General Consultation",
-      priority,
-      status: "WAITING",
-      consultationStartedAt: null,
-      calledAt: null,
-      completedAt: null,
-      skippedAt: null,
-      recalledAt: null,
-      qrCodeData,
-      trackingUrl,
-      notes,
-      createdAt: new Date().toISOString()
-    };
-
-    this.tokens.push(token);
-
-    this.logs.unshift({
-      id: `log-${Date.now()}`,
-      tokenId: id,
-      doctorId,
-      action: "REGISTERED",
-      notes: `Token ${tokenNumber} issued to ${patientName} (${appointmentType})`,
-      createdAt: new Date().toISOString()
-    });
-
-    const enrichedToken = this.enrichToken(token);
-    this.broadcast("TOKEN_CREATED", { token: enrichedToken, doctorId });
-    this.broadcast("QUEUE_UPDATED", { doctorId });
-
-    return enrichedToken;
   }
 
   getTokens({ doctorId, status } = {}) {
@@ -491,8 +600,8 @@ class MediQStore {
     const cleanId = String(id).trim();
     const token = this.tokens.find(
       t => t.id === cleanId ||
-           (t.passToken && t.passToken === cleanId) ||
-           t.tokenNumber.toUpperCase() === cleanId.toUpperCase()
+        (t.passToken && t.passToken === cleanId) ||
+        t.tokenNumber.toUpperCase() === cleanId.toUpperCase()
     );
     if (!token) return null;
     return this.enrichToken(token);
@@ -503,8 +612,8 @@ class MediQStore {
     const clean = String(identifier).trim();
     const token = this.tokens.find(
       t => (t.passToken && t.passToken === clean) ||
-           t.id === clean ||
-           t.tokenNumber.toUpperCase() === clean.toUpperCase()
+        t.id === clean ||
+        t.tokenNumber.toUpperCase() === clean.toUpperCase()
     );
     if (!token) return null;
 
@@ -577,12 +686,18 @@ class MediQStore {
       },
       eta: {
         estimatedWaitMinutes: enriched.eta?.estimatedWaitMinutes ?? 0,
+        minWaitMinutes: enriched.eta?.minWaitMinutes ?? 0,
+        maxWaitMinutes: enriched.eta?.maxWaitMinutes ?? 0,
+        formattedRange: enriched.eta?.formattedRange || "10–15 minutes",
         patientsAhead,
         currentServingToken: enriched.eta?.currentServingToken || null,
         isDelayed: isDoctorDelayed,
         delayMinutes: enriched.doctor?.currentDelayMins || 0,
         delayReason: enriched.doctor?.delayReason || "",
-        estimatedCallTime: enriched.eta?.estimatedCallTime || null
+        isPaused: Boolean(enriched.doctor?.isPaused),
+        pauseReason: enriched.doctor?.pauseReason || "",
+        estimatedCallTime: enriched.eta?.estimatedCallTime || null,
+        doctorPace: enriched.eta?.doctorPace || null
       }
     };
   }
@@ -596,7 +711,8 @@ class MediQStore {
       token,
       allTokensForDoctor: docTokens,
       doctor,
-      bufferMins: this.settings.consultationBufferMins
+      bufferMins: this.settings?.consultationBufferMins || 2,
+      clinicSettings: this.settings || {}
     });
 
     // Calculate queue position among waiting tokens for this doctor
@@ -605,14 +721,20 @@ class MediQStore {
     waitingTokens.sort((a, b) => {
       const rankDiff = (priorityRank[a.priority] ?? 2) - (priorityRank[b.priority] ?? 2);
       if (rankDiff !== 0) return rankDiff;
-      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      if (a.queueSequenceNumber && b.queueSequenceNumber) {
+        return a.queueSequenceNumber - b.queueSequenceNumber;
+      }
+      return new Date(a.createdAt || a.registeredAt).getTime() - new Date(b.createdAt || b.registeredAt).getTime();
     });
 
-    const queuePosition = token.status === "WAITING" 
-      ? waitingTokens.findIndex(t => t.id === token.id) + 1 
-      : token.status === "CALLING" || token.status === "IN_CONSULTATION" 
-      ? 1 
-      : 0;
+    const isConsulting = token.status === "CONSULTING" || token.status === "IN_CONSULTATION";
+    const isCalled = token.status === "CALLED" || token.status === "CALLING";
+
+    const queuePosition = token.status === "WAITING"
+      ? waitingTokens.findIndex(t => t.id === token.id) + 1
+      : isCalled || isConsulting
+        ? 1
+        : 0;
 
     return {
       ...token,
@@ -637,212 +759,283 @@ class MediQStore {
     };
   }
 
-  // Call the next patient in queue
-  callNextPatient(doctorId) {
+  // Call the next patient in queue (Guarded by Concurrency Lock)
+  async callNextPatient(doctorId, performedBy = { role: "staff", name: "Frontdesk Staff" }) {
     const doctor = this.doctors.find(d => d.id === doctorId);
     if (!doctor) throw new Error("Doctor not found");
 
-    if (doctor.isPaused) {
-      throw new Error(`Cannot call patient: ${doctor.name}'s queue is currently paused.`);
-    }
+    return this.withDoctorLock(doctorId, async () => {
+      if (doctor.isPaused) {
+        throw new Error(`Cannot call patient: Dr. ${doctor.name}'s queue is currently paused.`);
+      }
 
-    // Queue Rule: Do not allow two active consultations for the same doctor
-    const existingConsultation = this.tokens.find(
-      t => t.doctorId === doctorId && t.status === "IN_CONSULTATION"
-    );
-    if (existingConsultation) {
-      throw new Error(`Cannot call next patient: Doctor is currently in an active consultation with ${existingConsultation.patientName} (${existingConsultation.tokenNumber}). Please complete it first.`);
-    }
+      // Queue Rule: Do not allow two active consultations for the same doctor
+      const existingConsultation = this.tokens.find(
+        t => t.doctorId === doctorId && (t.status === "CONSULTING" || t.status === "IN_CONSULTATION")
+      );
+      if (existingConsultation) {
+        throw new Error(
+          `Cannot call next patient: Doctor is currently in consultation with ${existingConsultation.patientName} (${existingConsultation.tokenNumber}). Please complete or skip it first.`
+        );
+      }
 
-    const waitingTokens = this.tokens.filter(t => t.doctorId === doctorId && t.status === "WAITING");
+      // Queue Rule: Prevent duplicate calling if another patient is already waiting at door
+      const existingCalled = this.tokens.find(
+        t => t.doctorId === doctorId && (t.status === "CALLED" || t.status === "CALLING")
+      );
+      if (existingCalled) {
+        throw new Error(
+          `Cannot call next patient: Token ${existingCalled.tokenNumber} (${existingCalled.patientName}) is currently called. Please start consultation or skip before calling another.`
+        );
+      }
 
-    if (waitingTokens.length === 0) {
-      return null;
-    }
+      const waitingTokens = this.tokens.filter(t => t.doctorId === doctorId && t.status === "WAITING");
+      if (waitingTokens.length === 0) {
+        return null;
+      }
 
-    // Queue Rule: Preserve registration order by default with priority overrides
-    const priorityRank = { EMERGENCY: 0, SENIOR: 1, NORMAL: 2 };
-    waitingTokens.sort((a, b) => {
-      const rankDiff = (priorityRank[a.priority] ?? 2) - (priorityRank[b.priority] ?? 2);
-      if (rankDiff !== 0) return rankDiff;
-      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-    });
+      // Priority sort: EMERGENCY (0) > SENIOR (1) > NORMAL (2), then sequence number
+      const priorityRank = { EMERGENCY: 0, SENIOR: 1, NORMAL: 2 };
+      waitingTokens.sort((a, b) => {
+        const rankDiff = (priorityRank[a.priority] ?? 2) - (priorityRank[b.priority] ?? 2);
+        if (rankDiff !== 0) return rankDiff;
+        if (a.queueSequenceNumber && b.queueSequenceNumber) {
+          return a.queueSequenceNumber - b.queueSequenceNumber;
+        }
+        return new Date(a.createdAt || a.registeredAt).getTime() - new Date(b.createdAt || b.registeredAt).getTime();
+      });
 
-    const nextToken = waitingTokens[0];
-    nextToken.status = "CALLING";
-    nextToken.calledAt = new Date().toISOString();
+      const nextToken = waitingTokens[0];
+      const previousStatus = nextToken.status;
+      nextToken.status = "CALLED";
+      nextToken.calledAt = new Date().toISOString();
 
-    doctor.status = "AVAILABLE";
-
-    this.logs.unshift({
-      id: `log-${Date.now()}`,
-      tokenId: nextToken.id,
-      doctorId,
-      action: "CALLED",
-      notes: `Token ${nextToken.tokenNumber} called to ${doctor.cabinNumber}`,
-      createdAt: new Date().toISOString()
-    });
-
-    this.broadcast("PATIENT_CALLED", {
-      token: this.enrichToken(nextToken),
-      doctor,
-      cabin: doctor.cabinNumber
-    });
-    this.broadcast("QUEUE_UPDATED", { doctorId });
-
-    return this.enrichToken(nextToken);
-  }
-
-  // Start Consultation
-  startConsultation(tokenId) {
-    const token = this.tokens.find(t => t.id === tokenId);
-    if (!token) throw new Error("Token not found");
-
-    // Queue Rule: Prevent completed patients from being called/started again
-    if (token.status === "COMPLETED") {
-      throw new Error("This consultation has already been completed.");
-    }
-
-    // Queue Rule: Do not allow two active consultations for the same doctor
-    const anotherActive = this.tokens.find(
-      t => t.doctorId === token.doctorId && t.id !== tokenId && t.status === "IN_CONSULTATION"
-    );
-    if (anotherActive) {
-      throw new Error(`Cannot start consultation: Doctor is already consulting patient ${anotherActive.patientName} (${anotherActive.tokenNumber}).`);
-    }
-
-    token.status = "IN_CONSULTATION";
-    token.consultationStartedAt = new Date().toISOString();
-
-    const doctor = this.doctors.find(d => d.id === token.doctorId);
-    if (doctor) {
-      doctor.status = "IN_CONSULTATION";
-    }
-
-    this.logs.unshift({
-      id: `log-${Date.now()}`,
-      tokenId: token.id,
-      doctorId: token.doctorId,
-      action: "CONSULTATION_STARTED",
-      notes: `Consultation started for ${token.tokenNumber}`,
-      createdAt: new Date().toISOString()
-    });
-
-    this.broadcast("CONSULTATION_STARTED", { token: this.enrichToken(token), doctorId: token.doctorId });
-    this.broadcast("QUEUE_UPDATED", { doctorId: token.doctorId });
-
-    return this.enrichToken(token);
-  }
-
-  // Complete Consultation
-  finishConsultation(tokenId) {
-    const token = this.tokens.find(t => t.id === tokenId);
-    if (!token) throw new Error("Token not found");
-
-    if (token.status === "COMPLETED") {
-      throw new Error("This token has already been marked as completed.");
-    }
-
-    token.status = "COMPLETED";
-    token.completedAt = new Date().toISOString();
-
-    const doctor = this.doctors.find(d => d.id === token.doctorId);
-    if (doctor) {
       doctor.status = "AVAILABLE";
-    }
 
-    this.logs.unshift({
-      id: `log-${Date.now()}`,
-      tokenId: token.id,
-      doctorId: token.doctorId,
-      action: "COMPLETED",
-      notes: `Consultation finished for ${token.tokenNumber}`,
-      createdAt: new Date().toISOString()
+      this.logs.unshift({
+        id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        tokenId: nextToken.id,
+        tokenNumber: nextToken.tokenNumber,
+        doctorId,
+        action: "CALLED",
+        previousStatus,
+        newStatus: "CALLED",
+        performedBy,
+        notes: `Token ${nextToken.tokenNumber} (${nextToken.patientName}) called to ${doctor.cabinNumber}`,
+        timestamp: new Date().toISOString()
+      });
+
+      const enriched = this.enrichToken(nextToken);
+      this.broadcast("PATIENT_CALLED", {
+        token: enriched,
+        doctor,
+        cabin: doctor.cabinNumber
+      });
+      this.broadcast("QUEUE_UPDATED", { doctorId });
+
+      return enriched;
     });
+  }
 
-    this.broadcast("CONSULTATION_COMPLETED", { token: this.enrichToken(token), doctorId: token.doctorId });
-    this.broadcast("QUEUE_UPDATED", { doctorId: token.doctorId });
+  // Start Consultation (Guarded by Concurrency Lock)
+  async startConsultation(tokenId, performedBy = { role: "doctor", name: "Consulting Doctor" }) {
+    const token = this.tokens.find(t => t.id === tokenId);
+    if (!token) throw new Error("Token not found");
 
-    return this.enrichToken(token);
+    return this.withDoctorLock(token.doctorId, async () => {
+      if (token.status === "COMPLETED") {
+        throw new Error("This consultation has already been completed.");
+      }
+
+      const anotherActive = this.tokens.find(
+        t => t.doctorId === token.doctorId && t.id !== tokenId && (t.status === "CONSULTING" || t.status === "IN_CONSULTATION")
+      );
+      if (anotherActive) {
+        throw new Error(`Cannot start consultation: Doctor is already consulting patient ${anotherActive.patientName} (${anotherActive.tokenNumber}).`);
+      }
+
+      const previousStatus = token.status;
+      token.status = "CONSULTING";
+      token.consultationStartedAt = new Date().toISOString();
+
+      const doctor = this.doctors.find(d => d.id === token.doctorId);
+      if (doctor) {
+        doctor.status = "IN_CONSULTATION";
+      }
+
+      this.logs.unshift({
+        id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        tokenId: token.id,
+        tokenNumber: token.tokenNumber,
+        doctorId: token.doctorId,
+        action: "CONSULTATION_STARTED",
+        previousStatus,
+        newStatus: "CONSULTING",
+        performedBy,
+        notes: `Consultation started for ${token.tokenNumber} in ${doctor?.cabinNumber || "Cabin"}`,
+        timestamp: new Date().toISOString()
+      });
+
+      const enriched = this.enrichToken(token);
+      this.broadcast("CONSULTATION_STARTED", { token: enriched, doctorId: token.doctorId });
+      this.broadcast("QUEUE_UPDATED", { doctorId: token.doctorId });
+
+      return enriched;
+    });
+  }
+
+  // Complete Consultation (Guarded by Concurrency Lock)
+  async finishConsultation(tokenId, performedBy = { role: "doctor", name: "Consulting Doctor" }) {
+    const token = this.tokens.find(t => t.id === tokenId);
+    if (!token) throw new Error("Token not found");
+
+    return this.withDoctorLock(token.doctorId, async () => {
+      if (token.status === "COMPLETED") {
+        throw new Error("This token has already been marked as completed.");
+      }
+
+      const previousStatus = token.status;
+      token.status = "COMPLETED";
+      token.completedAt = new Date().toISOString();
+
+      // Record consultation actual duration in minutes for empirical dynamic ETA tracking
+      const startTime = token.consultationStartedAt ? new Date(token.consultationStartedAt) : new Date(Date.now() - 10 * 60000);
+      token.actualDurationMins = Math.max(1, Math.round((new Date(token.completedAt) - startTime) / 60000));
+
+      const doctor = this.doctors.find(d => d.id === token.doctorId);
+      if (doctor) {
+        doctor.status = "AVAILABLE";
+      }
+
+      this.logs.unshift({
+        id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        tokenId: token.id,
+        tokenNumber: token.tokenNumber,
+        doctorId: token.doctorId,
+        action: "COMPLETED",
+        previousStatus,
+        newStatus: "COMPLETED",
+        performedBy,
+        notes: `Consultation completed for ${token.tokenNumber} (${token.actualDurationMins} mins duration)`,
+        timestamp: new Date().toISOString()
+      });
+
+      const enriched = this.enrichToken(token);
+      this.broadcast("CONSULTATION_COMPLETED", { token: enriched, doctorId: token.doctorId });
+      this.broadcast("QUEUE_UPDATED", { doctorId: token.doctorId });
+
+      return enriched;
+    });
   }
 
   // Skip Patient (Skip / No-Show)
-  skipPatient(tokenId, reason = "Patient not present / skipped") {
+  async skipPatient(tokenId, reason = "Patient not present / skipped", performedBy = { role: "staff", name: "Staff Member" }) {
     const token = this.tokens.find(t => t.id === tokenId);
     if (!token) throw new Error("Token not found");
 
-    if (token.status === "COMPLETED") {
-      throw new Error("Cannot skip a consultation that has already completed.");
-    }
+    return this.withDoctorLock(token.doctorId, async () => {
+      if (token.status === "COMPLETED") {
+        throw new Error("Cannot skip a consultation that has already completed.");
+      }
 
-    token.status = "SKIPPED";
-    token.skippedAt = new Date().toISOString();
-    token.skipReason = reason;
+      const previousStatus = token.status;
+      token.status = "SKIPPED";
+      token.skippedAt = new Date().toISOString();
+      token.skipReason = reason;
 
-    const doctor = this.doctors.find(d => d.id === token.doctorId);
-    if (doctor && doctor.status === "IN_CONSULTATION") {
-      doctor.status = "AVAILABLE";
-    }
+      const doctor = this.doctors.find(d => d.id === token.doctorId);
+      if (doctor && doctor.status === "IN_CONSULTATION") {
+        doctor.status = "AVAILABLE";
+      }
 
-    this.logs.unshift({
-      id: `log-${Date.now()}`,
-      tokenId: token.id,
-      doctorId: token.doctorId,
-      action: "PATIENT_SKIPPED",
-      notes: `Token ${token.tokenNumber} skipped: ${reason}`,
-      createdAt: new Date().toISOString()
+      this.logs.unshift({
+        id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        tokenId: token.id,
+        tokenNumber: token.tokenNumber,
+        doctorId: token.doctorId,
+        action: "SKIPPED",
+        previousStatus,
+        newStatus: "SKIPPED",
+        performedBy,
+        notes: `Token ${token.tokenNumber} skipped: ${reason}`,
+        timestamp: new Date().toISOString()
+      });
+
+      const enriched = this.enrichToken(token);
+      this.broadcast("TOKEN_UPDATED", { token: enriched, doctorId: token.doctorId });
+      this.broadcast("QUEUE_UPDATED", { doctorId: token.doctorId });
+
+      return enriched;
     });
-
-    this.broadcast("TOKEN_UPDATED", { token: this.enrichToken(token), doctorId: token.doctorId });
-    this.broadcast("QUEUE_UPDATED", { doctorId: token.doctorId });
-
-    return this.enrichToken(token);
   }
 
-  // Recall Patient (Authorized staff recalls a skipped patient back to active queue)
-  recallPatient(tokenId) {
+  // Recall Patient (Follows Clinic's Configured Recall Policy)
+  async recallPatient(tokenId, performedBy = { role: "staff", name: "Staff Member" }) {
     const token = this.tokens.find(t => t.id === tokenId);
     if (!token) throw new Error("Token not found");
 
-    if (!["SKIPPED", "NO_SHOW"].includes(token.status)) {
-      throw new Error("Only skipped or no-show patients can be recalled.");
-    }
+    return this.withDoctorLock(token.doctorId, async () => {
+      if (!["SKIPPED", "NO_SHOW"].includes(token.status)) {
+        throw new Error("Only skipped or no-show patients can be recalled.");
+      }
 
-    const doctor = this.doctors.find(d => d.id === token.doctorId);
-    if (doctor && doctor.isPaused) {
-      throw new Error(`Cannot recall patient: ${doctor.name}'s queue is currently paused.`);
-    }
+      const doctor = this.doctors.find(d => d.id === token.doctorId);
+      if (doctor && doctor.isPaused) {
+        throw new Error(`Cannot recall patient: ${doctor.name}'s queue is currently paused.`);
+      }
 
-    // Check if doctor cabin is currently in consultation
-    const activeConsultation = this.tokens.find(
-      t => t.doctorId === token.doctorId && t.status === "IN_CONSULTATION"
-    );
-
-    if (activeConsultation) {
-      // Put them at front of waiting line with SENIOR/HIGH priority
-      token.status = "WAITING";
-      token.priority = "SENIOR"; // expedited
+      const previousStatus = token.status;
       token.recalledAt = new Date().toISOString();
-    } else {
-      // Direct call
-      token.status = "CALLING";
-      token.calledAt = new Date().toISOString();
-      token.recalledAt = new Date().toISOString();
-    }
+      delete token.skipReason;
 
-    this.logs.unshift({
-      id: `log-${Date.now()}`,
-      tokenId: token.id,
-      doctorId: token.doctorId,
-      action: "PATIENT_RECALLED",
-      notes: `Token ${token.tokenNumber} recalled to queue (${token.status})`,
-      createdAt: new Date().toISOString()
+      const policy = this.settings?.recallPolicy || "NEXT"; // "NEXT", "ORIGINAL_POSITION", "END"
+
+      if (policy === "NEXT") {
+        // Recalls patient directly to front of line with highest expedited priority
+        token.status = "WAITING";
+        token.priority = "EMERGENCY";
+      } else if (policy === "ORIGINAL_POSITION") {
+        // Restores to waiting queue maintaining original sequence number and registration order
+        token.status = "WAITING";
+      } else if (policy === "END") {
+        // Re-appends to the very end of the doctor's queue
+        token.status = "WAITING";
+        this.sequenceByDoctor[token.doctorId] = (this.sequenceByDoctor[token.doctorId] || 0) + 1;
+        token.queueSequenceNumber = this.sequenceByDoctor[token.doctorId];
+        token.createdAt = new Date().toISOString();
+      }
+
+      this.logs.unshift({
+        id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        tokenId: token.id,
+        tokenNumber: token.tokenNumber,
+        doctorId: token.doctorId,
+        action: "RECALLED",
+        previousStatus,
+        newStatus: token.status,
+        performedBy,
+        notes: `Token ${token.tokenNumber} recalled via policy: ${policy} (${token.priority} priority)`,
+        timestamp: new Date().toISOString()
+      });
+
+      const enriched = this.enrichToken(token);
+      this.broadcast("TOKEN_UPDATED", { token: enriched, doctorId: token.doctorId });
+      this.broadcast("QUEUE_UPDATED", { doctorId: token.doctorId });
+
+      return enriched;
     });
+  }
 
-    this.broadcast("TOKEN_UPDATED", { token: this.enrichToken(token), doctorId: token.doctorId });
-    this.broadcast("QUEUE_UPDATED", { doctorId: token.doctorId });
-
-    return this.enrichToken(token);
+  // Audit Logs API
+  getAuditLogs({ doctorId, tokenId, limit = 50 } = {}) {
+    let logs = [...this.logs];
+    if (doctorId && doctorId !== "ALL") {
+      logs = logs.filter(l => l.doctorId === doctorId);
+    }
+    if (tokenId) {
+      logs = logs.filter(l => l.tokenId === tokenId);
+    }
+    return logs.slice(0, Number(limit) || 50);
   }
 
   // Mark No-Show

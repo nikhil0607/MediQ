@@ -13,12 +13,14 @@ import {
   cancelToken,
   updatePriority,
   pauseQueue,
-  resumeQueue
+  resumeQueue,
+  getAuditLogs
 } from "../controllers/queueController.js";
 
 const router = express.Router();
 
 router.get("/tokens", getTokens);
+router.get("/audit-logs", getAuditLogs);
 router.get("/tokens/:id", getTokenById);
 router.get("/pass/:passToken", getPublicPass);
 router.post("/tokens", createToken);

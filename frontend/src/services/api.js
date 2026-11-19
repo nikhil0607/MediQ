@@ -2,8 +2,17 @@ const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
 async function request(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`;
+
+  let authUser = null;
+  try {
+    const raw = localStorage.getItem("mediq_auth_user");
+    if (raw) authUser = JSON.parse(raw);
+  } catch (e) {}
+
   const headers = {
     "Content-Type": "application/json",
+    "x-user-role": authUser?.role || "receptionist",
+    "x-user-name": authUser?.name || "Clinic Staff",
     ...(options.headers || {})
   };
 
@@ -63,6 +72,11 @@ export const api = {
   recallPatient: (tokenId) => request(`/queue/tokens/${tokenId}/recall`, {
     method: "POST"
   }),
+
+  getAuditLogs: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return request(`/queue/audit-logs${query ? `?${query}` : ""}`);
+  },
 
   markNoShow: (tokenId) => request(`/queue/tokens/${tokenId}/no-show`, {
     method: "POST"

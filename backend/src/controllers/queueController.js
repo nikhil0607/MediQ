@@ -1,5 +1,26 @@
 import { store } from "../db/store.js";
 
+// Helper: Extract staff identity for audit logging
+function extractStaffPerformer(req) {
+  const role = req.headers["x-user-role"] || req.user?.role || "staff";
+  const name = req.headers["x-user-name"] || req.user?.name || `${role.toUpperCase()} Staff`;
+  return { role, name };
+}
+
+// Rule 9: Only authorized staff can modify queue states
+function checkStaffAuthorization(req, res) {
+  const role = (req.headers["x-user-role"] || req.user?.role || "staff").toLowerCase();
+  const allowed = ["receptionist", "doctor", "admin", "staff"];
+  if (!allowed.includes(role)) {
+    res.status(403).json({
+      success: false,
+      message: "Forbidden: Only authorized clinical staff can perform queue operations."
+    });
+    return false;
+  }
+  return true;
+}
+
 export const getTokens = async (req, res) => {
   try {
     const { doctorId, status } = req.query;
@@ -41,6 +62,8 @@ export const getPublicPass = async (req, res) => {
 
 export const createToken = async (req, res) => {
   try {
+    if (!checkStaffAuthorization(req, res)) return;
+
     const {
       patientName,
       patientPhone,
@@ -66,6 +89,7 @@ export const createToken = async (req, res) => {
       });
     }
 
+    const performer = extractStaffPerformer(req);
     const token = await store.createToken({
       patientName: patientName.trim(),
       patientPhone: patientPhone ? patientPhone.trim() : "",
@@ -74,7 +98,8 @@ export const createToken = async (req, res) => {
       appointmentType: appointmentType || "General Consultation",
       doctorId,
       priority: priority || "NORMAL",
-      notes: notes ? notes.trim() : ""
+      notes: notes ? notes.trim() : "",
+      performedBy: performer
     });
 
     res.status(201).json({ success: true, message: "Token generated successfully", data: token });
@@ -85,12 +110,15 @@ export const createToken = async (req, res) => {
 
 export const callNextPatient = async (req, res) => {
   try {
+    if (!checkStaffAuthorization(req, res)) return;
+
     const { doctorId } = req.body;
     if (!doctorId) {
       return res.status(400).json({ success: false, message: "Doctor ID is required" });
     }
 
-    const token = store.callNextPatient(doctorId);
+    const performer = extractStaffPerformer(req);
+    const token = await store.callNextPatient(doctorId, performer);
     if (!token) {
       return res.status(200).json({
         success: false,
@@ -107,8 +135,11 @@ export const callNextPatient = async (req, res) => {
 
 export const startConsultation = async (req, res) => {
   try {
+    if (!checkStaffAuthorization(req, res)) return;
+
     const { id } = req.params;
-    const token = store.startConsultation(id);
+    const performer = extractStaffPerformer(req);
+    const token = await store.startConsultation(id, performer);
     res.json({ success: true, message: "Consultation started", data: token });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -117,8 +148,11 @@ export const startConsultation = async (req, res) => {
 
 export const finishConsultation = async (req, res) => {
   try {
+    if (!checkStaffAuthorization(req, res)) return;
+
     const { id } = req.params;
-    const token = store.finishConsultation(id);
+    const performer = extractStaffPerformer(req);
+    const token = await store.finishConsultation(id, performer);
     res.json({ success: true, message: "Consultation completed", data: token });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -127,9 +161,12 @@ export const finishConsultation = async (req, res) => {
 
 export const skipPatient = async (req, res) => {
   try {
+    if (!checkStaffAuthorization(req, res)) return;
+
     const { id } = req.params;
     const { reason } = req.body;
-    const token = store.skipPatient(id, reason);
+    const performer = extractStaffPerformer(req);
+    const token = await store.skipPatient(id, reason, performer);
     res.json({ success: true, message: `Patient ${token.tokenNumber} skipped`, data: token });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -138,8 +175,11 @@ export const skipPatient = async (req, res) => {
 
 export const recallPatient = async (req, res) => {
   try {
+    if (!checkStaffAuthorization(req, res)) return;
+
     const { id } = req.params;
-    const token = store.recallPatient(id);
+    const performer = extractStaffPerformer(req);
+    const token = await store.recallPatient(id, performer);
     res.json({ success: true, message: `Patient ${token.tokenNumber} recalled to queue`, data: token });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -148,8 +188,11 @@ export const recallPatient = async (req, res) => {
 
 export const markNoShow = async (req, res) => {
   try {
+    if (!checkStaffAuthorization(req, res)) return;
+
     const { id } = req.params;
-    const token = store.markNoShow(id);
+    const performer = extractStaffPerformer(req);
+    const token = await store.skipPatient(id, "Marked as No-Show", performer);
     res.json({ success: true, message: "Marked as No-Show", data: token });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -158,6 +201,8 @@ export const markNoShow = async (req, res) => {
 
 export const cancelToken = async (req, res) => {
   try {
+    if (!checkStaffAuthorization(req, res)) return;
+
     const { id } = req.params;
     const { reason } = req.body;
     const token = store.cancelToken(id, reason);
@@ -169,6 +214,8 @@ export const cancelToken = async (req, res) => {
 
 export const updatePriority = async (req, res) => {
   try {
+    if (!checkStaffAuthorization(req, res)) return;
+
     const { id } = req.params;
     const { priority } = req.body;
     if (!priority) {
@@ -183,10 +230,13 @@ export const updatePriority = async (req, res) => {
 
 export const pauseQueue = async (req, res) => {
   try {
+    if (!checkStaffAuthorization(req, res)) return;
+
     const { id } = req.params;
     const { reason } = req.body;
-    const doc = store.pauseQueue(id, reason);
-    res.json({ success: true, message: `Queue paused for ${doc.name}`, data: doc });
+    const performer = extractStaffPerformer(req);
+    const doc = store.pauseQueue(id, reason, performer);
+    res.json({ success: true, message: `Queue paused for Dr. ${doc.name}`, data: doc });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
@@ -194,10 +244,23 @@ export const pauseQueue = async (req, res) => {
 
 export const resumeQueue = async (req, res) => {
   try {
+    if (!checkStaffAuthorization(req, res)) return;
+
     const { id } = req.params;
-    const doc = store.resumeQueue(id);
-    res.json({ success: true, message: `Queue resumed for ${doc.name}`, data: doc });
+    const performer = extractStaffPerformer(req);
+    const doc = store.resumeQueue(id, performer);
+    res.json({ success: true, message: `Queue resumed for Dr. ${doc.name}`, data: doc });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+export const getAuditLogs = async (req, res) => {
+  try {
+    const { doctorId, tokenId, limit } = req.query;
+    const logs = store.getAuditLogs({ doctorId, tokenId, limit });
+    res.json({ success: true, count: logs.length, data: logs });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };

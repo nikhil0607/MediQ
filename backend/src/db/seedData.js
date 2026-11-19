@@ -262,6 +262,9 @@ export const initialSettings = {
   phone: "+91 (11) 4500-8000",
   emergencyPhone: "+91 98110 23456",
   consultationBufferMins: 2,
+  defaultConsultationMins: 12,
+  recallPolicy: "NEXT", // "NEXT" | "ORIGINAL_POSITION" | "END"
+  recentConsultationSampleLimit: 5,
   enableAudioChime: true,
   enableSmsAlerts: true,
   autoAdvanceNext: false

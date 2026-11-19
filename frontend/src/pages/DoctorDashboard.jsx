@@ -421,7 +421,7 @@ export function DoctorDashboard() {
                             )}
                           </div>
                           <div className="text-[11px] text-slate-500 mt-0.5">
-                            Est. wait: ~{tok.eta?.estimatedWaitMinutes || (idx + 1) * doctor.avgConsultationMins} mins
+                            Est. wait: {tok.eta?.formattedRange || `~${tok.eta?.estimatedWaitMinutes || (idx + 1) * doctor.avgConsultationMins} mins`}
                             {tok.notes ? ` • Note: ${tok.notes}` : ""}
                           </div>
                         </div>
