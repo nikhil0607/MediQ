@@ -2,6 +2,7 @@ import express from "express";
 import {
   getTokens,
   getTokenById,
+  getPublicPass,
   createToken,
   callNextPatient,
   startConsultation,
@@ -19,6 +20,7 @@ const router = express.Router();
 
 router.get("/tokens", getTokens);
 router.get("/tokens/:id", getTokenById);
+router.get("/pass/:passToken", getPublicPass);
 router.post("/tokens", createToken);
 router.post("/call-next", callNextPatient);
 router.post("/tokens/:id/start", startConsultation);

@@ -7,7 +7,8 @@ export function TokenReceiptModal({ token, onClose }) {
   if (!token) return null;
 
   const handleCopyLink = () => {
-    const url = `${window.location.origin}/track/${token.id}`;
+    const passIdentifier = token.passToken || token.id;
+    const url = `${window.location.origin}/track/${passIdentifier}`;
     navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
@@ -147,7 +148,7 @@ export function TokenReceiptModal({ token, onClose }) {
           </button>
 
           <a
-            href={`/track/${token.id}`}
+            href={`/track/${token.passToken || token.id}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-teal-700 hover:bg-teal-50 transition shadow-xs"

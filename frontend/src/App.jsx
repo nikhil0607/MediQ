@@ -89,7 +89,8 @@ function AppLayout() {
   const hideStaffNavbar =
     isLandingPage ||
     location.pathname === "/display" ||
-    location.pathname.startsWith("/track/");
+    location.pathname.startsWith("/track/") ||
+    location.pathname.startsWith("/pass/");
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 font-sans">
@@ -101,6 +102,7 @@ function AppLayout() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/track/:tokenId" element={<PatientTrackPage />} />
+          <Route path="/pass/:tokenId" element={<PatientTrackPage />} />
           <Route path="/display" element={<PublicQueueDisplayPage />} />
 
           {/* Protected Routes */}

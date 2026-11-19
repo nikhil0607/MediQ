@@ -23,6 +23,22 @@ export const getTokenById = async (req, res) => {
   }
 };
 
+export const getPublicPass = async (req, res) => {
+  try {
+    const { passToken } = req.params;
+    const pass = store.getPublicPass(passToken);
+    if (!pass) {
+      return res.status(404).json({
+        success: false,
+        message: "Invalid or expired queue pass."
+      });
+    }
+    res.json({ success: true, data: pass });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 export const createToken = async (req, res) => {
   try {
     const {

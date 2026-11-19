@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { initialDepartments, initialDoctors, initialSettings } from "./seedData.js";
 import { calculateETAForToken } from "../services/etaService.js";
 import QRCode from "qrcode";
@@ -238,17 +239,24 @@ class MediQStore {
       this.tokenCounterByDept[p.deptCode] = (this.tokenCounterByDept[p.deptCode] || 100) + 1;
       const tokenNumber = `${p.deptCode}-${this.tokenCounterByDept[p.deptCode]}`;
       const id = `tok-${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 6)}`;
+      const passToken = `pass_${crypto.randomBytes(12).toString("hex")}`;
       
-      const qrData = `http://localhost:5173/track/${id}`;
+      const clientBase = process.env.CLIENT_URL || "http://localhost:5173";
+      const qrData = `${clientBase}/track/${passToken}`;
       let qrCodeData = "";
       try {
-        qrCodeData = await QRCode.toDataURL(qrData, { width: 320, margin: 1 });
+        qrCodeData = await QRCode.toDataURL(qrData, {
+          width: 320,
+          margin: 1,
+          color: { dark: "#0f172a", light: "#ffffff" }
+        });
       } catch (err) {
         // ignore
       }
 
       this.tokens.push({
         id,
+        passToken,
         tokenNumber,
         doctorId: p.doctorId,
         patientName: p.patientName,
@@ -409,8 +417,12 @@ class MediQStore {
     this.tokenCounterByDept[dept.code] = (this.tokenCounterByDept[dept.code] || 100) + 1;
     const tokenNumber = `${dept.code}-${this.tokenCounterByDept[dept.code]}`;
     const id = `tok-${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 6)}`;
+    
+    // Cryptographically unpredictable queue pass identifier
+    const passToken = `pass_${crypto.randomBytes(12).toString("hex")}`;
+    const clientBase = process.env.CLIENT_URL || "http://localhost:5173";
+    const trackingUrl = `${clientBase}/track/${passToken}`;
 
-    const trackingUrl = `http://localhost:5173/track/${id}`;
     const qrCodeData = await QRCode.toDataURL(trackingUrl, {
       width: 320,
       margin: 1,
@@ -419,6 +431,7 @@ class MediQStore {
 
     const token = {
       id,
+      passToken,
       tokenNumber,
       doctorId,
       patientName,
@@ -450,10 +463,11 @@ class MediQStore {
       createdAt: new Date().toISOString()
     });
 
-    this.broadcast("TOKEN_CREATED", { token, doctorId });
+    const enrichedToken = this.enrichToken(token);
+    this.broadcast("TOKEN_CREATED", { token: enrichedToken, doctorId });
     this.broadcast("QUEUE_UPDATED", { doctorId });
 
-    return this.enrichToken(token);
+    return enrichedToken;
   }
 
   getTokens({ doctorId, status } = {}) {
@@ -473,9 +487,104 @@ class MediQStore {
   }
 
   getTokenById(id) {
-    const token = this.tokens.find(t => t.id === id || t.tokenNumber.toUpperCase() === id.toUpperCase());
+    if (!id) return null;
+    const cleanId = String(id).trim();
+    const token = this.tokens.find(
+      t => t.id === cleanId ||
+           (t.passToken && t.passToken === cleanId) ||
+           t.tokenNumber.toUpperCase() === cleanId.toUpperCase()
+    );
     if (!token) return null;
     return this.enrichToken(token);
+  }
+
+  getPublicPass(identifier) {
+    if (!identifier) return null;
+    const clean = String(identifier).trim();
+    const token = this.tokens.find(
+      t => (t.passToken && t.passToken === clean) ||
+           t.id === clean ||
+           t.tokenNumber.toUpperCase() === clean.toUpperCase()
+    );
+    if (!token) return null;
+
+    const enriched = this.enrichToken(token);
+
+    // Compute public queue status strictly matching the 8 possible states:
+    // Registered | Waiting | Almost Your Turn | Next in Line | Consulting | Completed | Delayed | Skipped
+    let queueStatus = "Waiting";
+    const isDoctorDelayed = Boolean(enriched.doctor?.currentDelayMins > 0 || enriched.eta?.isDelayed);
+    const patientsAhead = enriched.eta?.patientsAhead ?? 0;
+
+    if (enriched.status === "COMPLETED") {
+      queueStatus = "Completed";
+    } else if (enriched.status === "SKIPPED") {
+      queueStatus = "Skipped";
+    } else if (enriched.status === "IN_CONSULTATION") {
+      queueStatus = "Consulting";
+    } else if (enriched.status === "CALLING") {
+      queueStatus = "Next in Line";
+    } else if (isDoctorDelayed && enriched.status === "WAITING") {
+      queueStatus = "Delayed";
+    } else if (patientsAhead === 1 && enriched.status === "WAITING") {
+      queueStatus = "Next in Line";
+    } else if ((patientsAhead === 2 || patientsAhead === 3) && enriched.status === "WAITING") {
+      queueStatus = "Almost Your Turn";
+    } else if (enriched.queuePosition === 1 && patientsAhead === 0 && enriched.status === "WAITING") {
+      queueStatus = "Next in Line";
+    } else {
+      const ageMinutes = (Date.now() - new Date(enriched.createdAt).getTime()) / (60 * 1000);
+      if (ageMinutes < 3 && patientsAhead > 3) {
+        queueStatus = "Registered";
+      } else {
+        queueStatus = "Waiting";
+      }
+    }
+
+    // Mask patient name for privacy (e.g., "Sunita A." or "Sunita")
+    const parts = (enriched.patientName || "Patient").trim().split(/\s+/);
+    const maskedName = parts.length > 1
+      ? `${parts[0]} ${parts[parts.length - 1][0]}.`
+      : parts[0];
+
+    // Strictly privacy-safe payload (NO phone numbers, NO other patients' data, NO DB IDs)
+    return {
+      tokenNumber: enriched.tokenNumber,
+      passToken: enriched.passToken || enriched.id,
+      patientName: maskedName,
+      appointmentType: enriched.appointmentType,
+      status: enriched.status,
+      queueStatus,
+      queuePosition: enriched.queuePosition,
+      registeredAt: enriched.createdAt,
+      calledAt: enriched.calledAt,
+      consultationStartedAt: enriched.consultationStartedAt,
+      completedAt: enriched.completedAt,
+      clinicName: this.settings?.clinicName || "MediQ Apex Multi-Specialty Hospital & Research Institute",
+      clinicAddress: this.settings?.address || "Sector 14, Institutional Area, New Delhi - 110025",
+      doctor: {
+        name: enriched.doctor?.name || "Consulting Physician",
+        specialization: enriched.doctor?.specialization || "General Medicine",
+        cabinNumber: enriched.doctor?.cabinNumber || "Cabin",
+        currentDelayMins: enriched.doctor?.currentDelayMins || 0,
+        delayReason: enriched.doctor?.delayReason || "",
+        isPaused: Boolean(enriched.doctor?.isPaused),
+        pauseReason: enriched.doctor?.pauseReason || ""
+      },
+      department: {
+        name: enriched.department?.name || "General Outpatient",
+        floor: enriched.department?.floor || "Ground Floor"
+      },
+      eta: {
+        estimatedWaitMinutes: enriched.eta?.estimatedWaitMinutes ?? 0,
+        patientsAhead,
+        currentServingToken: enriched.eta?.currentServingToken || null,
+        isDelayed: isDoctorDelayed,
+        delayMinutes: enriched.doctor?.currentDelayMins || 0,
+        delayReason: enriched.doctor?.delayReason || "",
+        estimatedCallTime: enriched.eta?.estimatedCallTime || null
+      }
+    };
   }
 
   enrichToken(token) {

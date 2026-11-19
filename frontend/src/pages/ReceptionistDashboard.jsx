@@ -1078,7 +1078,7 @@ export function ReceptionistDashboard() {
 
                               {/* View Patient Live Pass */}
                               <a
-                                href={`/track/${token.id}`}
+                                href={`/track/${token.passToken || token.id}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-teal-50 text-teal-700 transition cursor-pointer"

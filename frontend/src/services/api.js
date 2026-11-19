@@ -35,6 +35,8 @@ export const api = {
 
   getTokenById: (id) => request(`/queue/tokens/${id}`),
 
+  getPublicPass: (passToken) => request(`/queue/pass/${passToken}`),
+
   createToken: (payload) => request("/queue/tokens", {
     method: "POST",
     body: JSON.stringify(payload)
